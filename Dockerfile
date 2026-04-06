@@ -25,13 +25,15 @@ RUN pip install --upgrade pip \
 COPY . .
 
 # ─────────────────────────────────────────
-# Pre-seed database (safe)
+# Pre-seed database (FIXED ✅)
 # ─────────────────────────────────────────
-RUN python -c "from data.seed_database import seed_database; \
-try: \
-    seed_database('data/fixtures/benchmark_seed42.db', 50000) \
-except Exception as e: \
-    print('Seeding skipped:', e)"
+RUN python - <<EOF
+from data.seed_database import seed_database
+try:
+    seed_database("data/fixtures/benchmark_seed42.db", 50000)
+except Exception as e:
+    print("Seeding skipped:", e)
+EOF
 
 # ─────────────────────────────────────────
 # Non-root user
