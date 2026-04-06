@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+.pytest_cache/
+/tmp/curriculum_state.json
+create_project.bat
+create_project.bat.txt

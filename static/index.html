@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SQL Optimization RL Environment</title>
+  <style>
+    :root { --bg: #0f1419; --panel: #1a2332; --accent: #3b82f6; --text: #e2e8f0; --muted: #64748b; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 2rem; }
+    h1 { color: var(--accent); margin-bottom: 0.5rem; }
+    .subtitle { color: var(--muted); margin-bottom: 2rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+    .card { background: var(--panel); border-radius: 12px; padding: 1.5rem; border: 1px solid #2d3748; }
+    .card h3 { color: var(--accent); margin-bottom: 0.5rem; }
+    .badge { display: inline-block; background: #1e40af; color: #93c5fd; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; margin: 2px; }
+    .stat { font-size: 2rem; font-weight: 700; color: var(--accent); }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { padding: 0.5rem 1rem; text-align: left; border-bottom: 1px solid #2d3748; }
+    th { color: var(--muted); font-weight: 600; }
+    #health-status { padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; }
+    .ok { background: #065f46; color: #6ee7b7; }
+    .err { background: #7f1d1d; color: #fca5a5; }
+    button { background: var(--accent); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; margin-top: 1rem; }
+    button:hover { opacity: 0.9; }
+    pre { background: #0d1117; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.85rem; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>🗄️ SQL Optimization RL Environment</h1>
+  <p class="subtitle">OpenEnv-compliant • 4 Indian domains • 9 tasks • 5 curriculum levels</p>
+  <span id="health-status">Loading…</span>
+
+  <div class="grid" id="domain-grid"></div>
+
+  <h2 style="margin-top:2rem;">📋 Tasks</h2>
+  <table id="task-table">
+    <thead><tr><th>Task ID</th><th>Level</th><th>Difficulty</th><th>Pattern</th></tr></thead>
+    <tbody id="task-body"></tbody>
+  </table>
+
+  <h2 style="margin-top:2rem;">🧪 Quick Test</h2>
+  <button onclick="testReset()">GET /reset</button>
+  <pre id="test-output">Click a button to test an endpoint…</pre>
+
+  <script>
+    const BASE = '';
+
+    async function loadHealth() {
+      try {
+        const r = await fetch(BASE + '/health');
+        const d = await r.json();
+        const el = document.getElementById('health-status');
+        el.textContent = `✅ ${d.status} — ${d.total_rows.toLocaleString()} rows`;
+        el.className = 'ok';
+      } catch (e) {
+        const el = document.getElementById('health-status');
+        el.textContent = '❌ Offline';
+        el.className = 'err';
+      }
+    }
+
+    async function loadTasks() {
+      try {
+        const r = await fetch(BASE + '/tasks');
+        const tasks = await r.json();
+        const tbody = document.getElementById('task-body');
+        tasks.forEach(t => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${t.task_id}</td><td>${t.curriculum_level}</td><td>${t.difficulty}</td><td><span class="badge">${t.expected_pattern}</span></td>`;
+          tbody.appendChild(tr);
+        });
+      } catch (e) { console.error(e); }
+    }
+
+    async function testReset() {
+      const out = document.getElementById('test-output');
+      out.textContent = 'Loading…';
+      try {
+        const r = await fetch(BASE + '/reset');
+        const d = await r.json();
+        out.textContent = JSON.stringify(d, null, 2);
+      } catch (e) { out.textContent = 'Error: ' + e.message; }
+    }
+
+    loadHealth();
+    loadTasks();
+  </script>
+</body>
+</html>

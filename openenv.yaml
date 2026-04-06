@@ -1,0 +1,167 @@
+spec_version: 1
+name: sql-optimization-env
+version: "1.0.0"
+
+description: >
+  RL environment for training agents to optimise SQL queries on 4 Indian
+  government schemas: GST, PDS (Ration), IRCTC (Railway), MGNREGA.
+  9 tasks across 5 curriculum levels. Real SQLite execution with SEED=42.
+
+type: space
+runtime: fastapi
+app: server.main:app
+port: 7860
+
+tasks:
+  - id: pds_select_star
+    level: 1
+    pattern: SELECT_STAR
+
+  - id: gst_missing_index
+    level: 2
+    pattern: MISSING_INDEX
+
+  - id: railway_simple_filter
+    level: 2
+    pattern: MISSING_INDEX
+
+  - id: gst_n_plus_one
+    level: 3
+    pattern: N_PLUS_ONE
+
+  - id: pds_cartesian
+    level: 3
+    pattern: CARTESIAN_PRODUCT
+
+  - id: mgnrega_wildcard
+    level: 3
+    pattern: LEADING_WILDCARD
+
+  - id: gst_multi_join
+    level: 4
+    pattern: N_PLUS_ONE
+
+  - id: railway_tatkal_workload
+    level: 4
+    pattern: N_PLUS_ONE
+
+  - id: mgnrega_schema_e
+    level: 5
+    pattern: UNBOUNDED_AGGREGATION
+
+# ✅ FIXED: Now fully matches your Pydantic Observation model
+observation_space:
+  type: object
+  required:
+    - task_id
+    - step_number
+    - goal
+    - schema_ddl
+    - current_query
+    - execution_plan
+    - execution_time_ms
+    - row_count
+    - db_stats
+    - curriculum_level
+  properties:
+    task_id:
+      type: string
+
+    step_number:
+      type: integer
+
+    goal:
+      type: string
+
+    schema_ddl:
+      type: string
+
+    current_query:
+      type: string
+
+    execution_plan:
+      type: object
+
+    execution_time_ms:
+      type: number
+
+    row_count:
+      type: integer
+
+    db_stats:
+      type: object
+
+    curriculum_level:
+      type: integer
+      minimum: 1
+      maximum: 5
+
+    anti_pattern_hint:
+      type: string
+      nullable: true
+
+    error_message:
+      type: string
+      nullable: true
+
+# ✅ FIXED: Matches SQLOptAction exactly
+action_space:
+  type: object
+  required:
+    - optimized_query
+  properties:
+    optimized_query:
+      type: string
+
+    identified_pattern:
+      type: string
+      enum:
+        - N_PLUS_ONE
+        - CARTESIAN_PRODUCT
+        - MISSING_INDEX
+        - SELECT_STAR
+        - LEADING_WILDCARD
+        - IMPLICIT_CAST
+        - UNBOUNDED_AGGREGATION
+        - NONE
+
+    explanation:
+      type: string
+
+    index_statements:
+      type: array
+      items:
+        type: string
+
+    schema_analysis:
+      type: string
+
+# ✅ Good as-is (kept)
+graders:
+  - name: speedup
+    weight: 0.35
+    range: [0.0, 0.35]
+
+  - name: equivalence
+    weight: 0.25
+    range: [0.0, 0.25]
+
+  - name: pattern
+    weight: 0.20
+    range: [0.0, 0.20]
+
+  - name: index
+    weight: 0.10
+    range: [0.0, 0.10]
+
+  - name: simplicity
+    weight: 0.10
+    range: [0.0, 0.10]
+
+# ✅ Good as-is
+curriculum:
+  levels: 5
+  graduate_threshold: 0.70
+  graduate_consecutive: 3
+  remediate_threshold: 0.40
+  remediate_consecutive: 2
