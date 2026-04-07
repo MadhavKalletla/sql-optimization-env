@@ -19,6 +19,7 @@
       --warn: #f59e0b;
       --bad: #ef4444;
       --header-h: 72px;
+      --progress-h: 64px;
       --radius: 12px;
     }
 
@@ -122,8 +123,147 @@
       font-size: 0.8rem;
     }
 
+    .progress-strip {
+      position: fixed;
+      top: var(--header-h);
+      left: 0;
+      right: 0;
+      min-height: var(--progress-h);
+      background: #111827;
+      border-bottom: 1px solid var(--border);
+      z-index: 90;
+      padding: 8px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .streak-dots {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      min-height: 12px;
+    }
+
+    .streak-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid #475569;
+      background: transparent;
+    }
+
+    .streak-dot.good {
+      background: #22c55e;
+      border-color: #16a34a;
+    }
+
+    .streak-dot.bad {
+      background: #ef4444;
+      border-color: #dc2626;
+    }
+
+    .stepper {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      align-items: center;
+    }
+
+    .step-level {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid #475569;
+      background: #1f2937;
+      margin: 0 auto;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .step-level.completed {
+      background: #14532d;
+      border-color: #16a34a;
+      color: #86efac;
+    }
+
+    .step-level.current {
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+      animation: pulse-ring 1.4s infinite;
+    }
+
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6); }
+      70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+    }
+
+    .step-tooltip {
+      font-size: 0.78rem;
+      color: #cbd5e1;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 8px;
+      min-height: 30px;
+    }
+
+    .level-banner {
+      position: fixed;
+      top: calc(var(--header-h) + var(--progress-h) + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid #f59e0b;
+      color: #fde68a;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      z-index: 120;
+      display: none;
+    }
+
+    .levelup-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.78);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+    }
+
+    .levelup-overlay.show {
+      display: flex;
+      opacity: 1;
+    }
+
+    .levelup-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 20px 24px;
+      text-align: center;
+      min-width: 280px;
+      max-width: 420px;
+    }
+
+    .levelup-emoji {
+      font-size: 2.6rem;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
     .app {
-      margin-top: var(--header-h);
+      margin-top: calc(var(--header-h) + var(--progress-h));
       padding: 16px;
       display: grid;
       grid-template-columns: minmax(0, 1fr) 320px;
@@ -416,6 +556,20 @@
       <span class="stat-badge" id="streakCounter">Streak: 0</span>
     </div>
   </header>
+  <div class="progress-strip">
+    <div class="streak-dots" id="recentDots"></div>
+    <div class="stepper" id="levelStepper"></div>
+    <div class="step-tooltip" id="levelTooltip">Click a level circle to see difficulty details.</div>
+  </div>
+  <div class="level-banner" id="stepDownBanner"></div>
+  <div class="levelup-overlay" id="levelUpOverlay">
+    <div class="levelup-card">
+      <div class="levelup-emoji" id="levelUpEmoji">🚀</div>
+      <h2 style="margin:0 0 8px;">LEVEL UP!</h2>
+      <div id="levelUpText" style="font-weight:700; margin-bottom:6px;">Level 2 unlocked</div>
+      <div class="muted">Trigger score: <span id="levelUpScore">0.00</span></div>
+    </div>
+  </div>
 
   <main class="app">
     <section class="primary">
@@ -512,14 +666,28 @@
 
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvasconfetti@1.9.2/dist/confetti.browser.min.js"></script>
   <script>
+    const PREV_LEVEL_KEY = "sqlopt_prev_level";
+    const levelDescriptions = {
+      1: "L1: Foundational anti-patterns and basic rewrites.",
+      2: "L2: Index-aware filtering and practical optimization.",
+      3: "L3: Multi-join reasoning, cost awareness, and plan literacy.",
+      4: "L4: Advanced workload tuning with tougher constraints.",
+      5: "L5: Expert-level SQL optimization under strict correctness."
+    };
+    const levelEmojis = { 2: "🚀", 3: "🔥", 4: "💀", 5: "👑" };
+
     const stateStore = {
       tasks: [],
       currentTask: null,
       episodes: 0,
       streak: 0,
       history: [],
-      episodeDone: false
+      episodeDone: false,
+      level: 1,
+      recentScores: [],
+      justAutoLoadedTask: false
     };
 
     const levelColors = {
@@ -564,7 +732,15 @@
       speedupText: document.getElementById("speedupText"),
       penaltyRow: document.getElementById("penaltyRow"),
       passFailBadge: document.getElementById("passFailBadge"),
-      historyList: document.getElementById("historyList")
+      historyList: document.getElementById("historyList"),
+      levelStepper: document.getElementById("levelStepper"),
+      levelTooltip: document.getElementById("levelTooltip"),
+      recentDots: document.getElementById("recentDots"),
+      stepDownBanner: document.getElementById("stepDownBanner"),
+      levelUpOverlay: document.getElementById("levelUpOverlay"),
+      levelUpEmoji: document.getElementById("levelUpEmoji"),
+      levelUpText: document.getElementById("levelUpText"),
+      levelUpScore: document.getElementById("levelUpScore")
     };
 
     function clamp01(value) {
@@ -591,11 +767,108 @@
       return state.streak_target || state.level_up_streak || 3;
     }
 
+    function inferRecentScores(state) {
+      if (Array.isArray(state.recent_scores)) return state.recent_scores.slice(-5);
+      if (Array.isArray(state.last_scores)) return state.last_scores.slice(-5);
+      return [];
+    }
+
+    function inferLevelDownReason(state) {
+      return state.level_down_reason || "Score below 0.40 for 2 episodes";
+    }
+
+    function renderStepper(level) {
+      ui.levelStepper.innerHTML = "";
+      for (let i = 1; i <= 5; i += 1) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "step-level";
+        if (i < level) {
+          btn.classList.add("completed");
+          btn.textContent = "✓";
+        } else {
+          btn.textContent = "L" + i;
+        }
+        if (i === level) btn.classList.add("current");
+        btn.addEventListener("click", function() {
+          ui.levelTooltip.textContent = levelDescriptions[i];
+        });
+        ui.levelStepper.appendChild(btn);
+      }
+    }
+
+    function renderRecentDots(scores) {
+      ui.recentDots.innerHTML = "";
+      const shown = (scores || []).slice(-5);
+      if (!shown.length) {
+        const placeholder = document.createElement("span");
+        placeholder.className = "muted";
+        placeholder.style.fontSize = "0.78rem";
+        placeholder.textContent = "Recent episode scores";
+        ui.recentDots.appendChild(placeholder);
+        return;
+      }
+      shown.forEach(function(score) {
+        const dot = document.createElement("span");
+        dot.className = "streak-dot";
+        const value = Number(score) || 0;
+        if (value >= 0.7) dot.classList.add("good");
+        else if (value < 0.4) dot.classList.add("bad");
+        dot.title = "Score " + value.toFixed(2);
+        ui.recentDots.appendChild(dot);
+      });
+    }
+
+    function fireConfetti() {
+      if (typeof confetti !== "function") return;
+      const duration = 2200;
+      const end = Date.now() + duration;
+      (function frame() {
+        confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+        if (Date.now() < end) window.requestAnimationFrame(frame);
+      })();
+    }
+
+    async function showLevelUpAnimation(newLevel, triggerScore) {
+      ui.levelUpEmoji.textContent = levelEmojis[newLevel] || "🚀";
+      ui.levelUpText.textContent = "Level " + newLevel + " unlocked";
+      ui.levelUpScore.textContent = Number(triggerScore || 0).toFixed(2);
+      ui.levelUpOverlay.classList.add("show");
+      fireConfetti();
+      await new Promise(function(resolve) { window.setTimeout(resolve, 3000); });
+      ui.levelUpOverlay.classList.remove("show");
+      await new Promise(function(resolve) { window.setTimeout(resolve, 350); });
+      await resetToTask(ui.taskSelect.value);
+      stateStore.justAutoLoadedTask = true;
+    }
+
+    function showStepDownBanner(level, reason) {
+      ui.stepDownBanner.textContent = "Stepping back to Level " + level + " - keep practicing! " + reason;
+      ui.stepDownBanner.style.display = "block";
+      window.setTimeout(function() {
+        ui.stepDownBanner.style.display = "none";
+      }, 5000);
+    }
+
+    async function applyStateTransition(state, triggerScore) {
+      const prevLevelRaw = window.localStorage.getItem(PREV_LEVEL_KEY);
+      const prevLevel = Number(prevLevelRaw || stateStore.level || 1);
+      const nextLevel = Math.max(1, Math.min(5, Number(inferLevel(state)) || 1));
+
+      if (nextLevel > prevLevel) {
+        await showLevelUpAnimation(nextLevel, triggerScore);
+      } else if (nextLevel < prevLevel) {
+        showStepDownBanner(nextLevel, inferLevelDownReason(state));
+      }
+      window.localStorage.setItem(PREV_LEVEL_KEY, String(nextLevel));
+    }
+
     function renderCurriculum(state = {}) {
       const level = Math.max(1, Math.min(5, Number(inferLevel(state)) || 1));
       const streak = Number(inferStreak(state)) || 0;
       const target = Math.max(1, Number(inferTarget(state, level)) || 3);
       const next = Math.min(5, level + 1);
+      const recent = inferRecentScores(state);
 
       ui.levelText.textContent = "Level " + level;
       ui.levelDot.style.background = levelColors[level] || levelColors[1];
@@ -603,6 +876,10 @@
       ui.streakProgress.style.width = (Math.min(streak, target) / target) * 100 + "%";
       ui.streakCounter.textContent = "Streak: " + streak;
       stateStore.streak = streak;
+      stateStore.level = level;
+      stateStore.recentScores = recent;
+      renderStepper(level);
+      renderRecentDots(recent);
     }
 
     function renderCounters() {
@@ -751,10 +1028,16 @@
       return res.json();
     }
 
-    async function loadStateAndRender() {
+    async function loadStateAndRender(triggerScore) {
       try {
         const state = await fetchJson("/state");
         renderCurriculum(state);
+        stateStore.justAutoLoadedTask = false;
+        if (triggerScore !== undefined) {
+          await applyStateTransition(state, triggerScore);
+        } else {
+          window.localStorage.setItem(PREV_LEVEL_KEY, String(stateStore.level));
+        }
         return state;
       } catch (err) {
         renderCurriculum({ curriculum_level: 1, streak: 0, streak_target: 3 });
@@ -839,10 +1122,17 @@
 
         if (result.done === true) {
           stateStore.episodeDone = true;
-          await loadStateAndRender();
-          ui.nextTaskBtn.style.display = "block";
-          ui.submitBtn.disabled = true;
-          ui.feedbackNote.textContent = "Episode complete. Ready for next task.";
+          await loadStateAndRender(total);
+          if (stateStore.justAutoLoadedTask) {
+            ui.nextTaskBtn.style.display = "none";
+            ui.submitBtn.disabled = false;
+            stateStore.episodeDone = false;
+            ui.feedbackNote.textContent = "Level updated. Next task loaded automatically.";
+          } else {
+            ui.nextTaskBtn.style.display = "block";
+            ui.submitBtn.disabled = true;
+            ui.feedbackNote.textContent = "Episode complete. Ready for next task.";
+          }
         } else {
           stateStore.episodeDone = false;
           ui.feedbackNote.textContent = "Step submitted. Keep iterating.";
