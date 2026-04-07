@@ -21,9 +21,17 @@ class EquivalenceGrader:
         conn = sqlite3.connect(str(db))
 
         try:
-            original_rows = list(
-                map(tuple, conn.execute(task.slow_query).fetchall())
-            )
+            baseline_query = task.slow_query
+
+            # SELECT_STAR tasks intentionally change projection; use the
+            # task's reference fix as the semantic baseline when available.
+            if getattr(task, "expected_pattern", None) == "SELECT_STAR":
+                ref_fix = getattr(task, "reference_fix", "") or ""
+                ref_fix = ref_fix.strip()
+                if ref_fix:
+                    baseline_query = ref_fix
+
+            original_rows = list(map(tuple, conn.execute(baseline_query).fetchall()))
 
             try:
                 opt_rows = list(
