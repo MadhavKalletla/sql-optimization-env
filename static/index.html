@@ -518,7 +518,8 @@
       currentTask: null,
       episodes: 0,
       streak: 0,
-      history: []
+      history: [],
+      episodeDone: false
     };
 
     const levelColors = {
@@ -690,7 +691,7 @@
     }
 
     function normalizeScores(response) {
-      const parts = response.score_breakdown || response.breakdown || response.components || {};
+      const parts = response.reward_detail || response.score_breakdown || response.breakdown || response.components || {};
       return {
         speedup: clamp01(Number(parts.speedup_score ?? parts.speedup ?? 0)),
         equivalence: clamp01(Number(parts.equivalence_score ?? parts.equivalence ?? 0)),
@@ -702,9 +703,10 @@
 
     function showReward(response) {
       const scores = normalizeScores(response);
-      const total = Number(response.total_reward ?? response.total_score ?? response.reward ?? 0);
-      const speedupRatio = Number(response.speedup_ratio ?? response.speedup ?? 1);
-      const penalties = Number(response.penalties ?? response.penalty ?? 0);
+      const detail = response.reward_detail || {};
+      const total = Number(response.total_reward ?? response.total_score ?? response.reward ?? detail.total ?? 0);
+      const speedupRatio = Number(response.speedup_ratio ?? response.speedup ?? detail.speedup_ratio ?? 1);
+      const penalties = Number(response.penalties ?? response.penalty ?? detail.penalties ?? 0);
       const pass = Boolean(response.passed ?? response.pass ?? total >= 0.7);
 
       ui.rewardCard.style.display = "block";
@@ -750,9 +752,14 @@
     }
 
     async function loadStateAndRender() {
-      const state = await fetchJson("/state");
-      renderCurriculum(state);
-      return state;
+      try {
+        const state = await fetchJson("/state");
+        renderCurriculum(state);
+        return state;
+      } catch (err) {
+        renderCurriculum({ curriculum_level: 1, streak: 0, streak_target: 3 });
+        return null;
+      }
     }
 
     async function loadTasks() {
@@ -776,6 +783,8 @@
       renderTask(task);
       ui.feedbackNote.textContent = "";
       ui.nextTaskBtn.style.display = "none";
+      stateStore.episodeDone = false;
+      ui.submitBtn.disabled = false;
       return task;
     }
 
@@ -793,6 +802,10 @@
 
     async function submitStep() {
       try {
+        if (stateStore.episodeDone) {
+          ui.feedbackNote.textContent = "Episode already complete. Click Load Next Task.";
+          return;
+        }
         setSubmitLoading(true);
         ui.feedbackNote.textContent = "";
 
@@ -812,8 +825,8 @@
         stateStore.episodes += 1;
         showReward(result);
 
-        const total = Number(result.total_reward ?? result.total_score ?? result.reward ?? 0);
-        const speed = Number(result.speedup_ratio ?? result.speedup ?? 1);
+        const total = Number(result.total_reward ?? result.total_score ?? result.reward ?? result.reward_detail?.total ?? 0);
+        const speed = Number(result.speedup_ratio ?? result.speedup ?? result.reward_detail?.speedup_ratio ?? 1);
         stateStore.history.unshift({
           task: stateStore.currentTask?.task_id || "unknown_task",
           pattern: ui.patternSelect.value,
@@ -825,17 +838,31 @@
         renderHistory();
 
         if (result.done === true) {
+          stateStore.episodeDone = true;
           await loadStateAndRender();
           ui.nextTaskBtn.style.display = "block";
+          ui.submitBtn.disabled = true;
           ui.feedbackNote.textContent = "Episode complete. Ready for next task.";
         } else {
+          stateStore.episodeDone = false;
           ui.feedbackNote.textContent = "Step submitted. Keep iterating.";
         }
       } catch (err) {
-        ui.feedbackNote.textContent = err.message;
+        if (String(err.message || "").includes("Call reset() first")) {
+          stateStore.episodeDone = true;
+          ui.nextTaskBtn.style.display = "block";
+          ui.submitBtn.disabled = true;
+          ui.feedbackNote.textContent = "Episode ended on server. Click Load Next Task.";
+        } else {
+          ui.feedbackNote.textContent = err.message;
+        }
       } finally {
         renderCounters();
-        setSubmitLoading(false);
+        if (!stateStore.episodeDone) {
+          setSubmitLoading(false);
+        } else {
+          ui.submitBtn.innerHTML = "Submit Optimization";
+        }
       }
     }
 
