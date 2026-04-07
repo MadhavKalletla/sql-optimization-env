@@ -15,8 +15,10 @@ from openai import OpenAI
 
 # ── Configuration ─────────────────────────────────────────────────────────
 API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
-API_KEY = os.environ.get("OPENAI_API_KEY", os.environ.get("HF_TOKEN", ""))
 MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4o-mini")
+HF_TOKEN = os.environ.get("HF_TOKEN")
+LOCAL_IMAGE_NAME = os.environ.get("LOCAL_IMAGE_NAME")
+API_KEY = HF_TOKEN or ""
 ENV_BASE_URL = os.environ.get("ENV_URL", "http://localhost:7860")
 
 TEMPERATURE = 0.0
