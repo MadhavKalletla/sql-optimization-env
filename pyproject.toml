@@ -1,0 +1,18 @@
+[project]
+name = "sql-optimization-env"
+version = "0.1.0"
+description = "SQL Optimization OpenEnv Hackathon Environment"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.111.0",
+    "uvicorn==0.29.0",
+    "pydantic==2.7.1",
+    "openai==1.30.0",
+    "requests==2.32.2",
+    "python-dotenv==1.0.1",
+    "jinja2==3.1.4",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
