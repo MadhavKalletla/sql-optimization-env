@@ -1,7 +1,12 @@
 # server/app.py
-# OpenEnv requires this entry point at server/app.py
-# Re-exports the FastAPI app from main.py
 
-from server.main import app  # noqa: F401
+from server.main import app
 
-__all__ = ["app"]
+
+def main():
+    import uvicorn
+    uvicorn.run("server.main:app", host="0.0.0.0", port=8000)
+
+
+if __name__ == "__main__":
+    main()
