@@ -13,13 +13,18 @@ import { EpisodeHistory } from '@/components/dashboard/EpisodeHistory'
 import { LevelUpToast } from '@/components/dashboard/LevelUpToast'
 
 const TASK_OPTIONS = [
-  { id: 'pds_select_star', label: 'PDS SELECT *', difficulty: 'Easy' },
-  { id: 'gst_missing_index', label: 'GST Missing Index', difficulty: 'Easy' },
-  { id: 'railway_simple_filter', label: 'Railway Filter', difficulty: 'Easy' },
-  { id: 'gst_n_plus_one', label: 'GST N+1 Query', difficulty: 'Medium' },
-  { id: 'pds_cartesian', label: 'PDS Cartesian', difficulty: 'Medium' },
-  { id: 'mgnrega_wildcard', label: 'MGNREGA Wildcard', difficulty: 'Medium' },
-  { id: 'gst_multi_join', label: 'GST Multi-Join', difficulty: 'Hard' },
+  { id: 'pds_select_star',            label: 'PDS: Avoid SELECT *',          difficulty: 'Easy' },
+  { id: 'mgnrega_count',              label: 'MGNREGA: Column Reduction',    difficulty: 'Easy' },
+  { id: 'gst_missing_index',          label: 'GST: Add Missing Index',        difficulty: 'Easy' },
+  { id: 'railway_simple_filter',      label: 'Railway: Filter Index',         difficulty: 'Easy' },
+  { id: 'railway_missing_index',      label: 'Railway: Journey Date Index',   difficulty: 'Medium' },
+  { id: 'gst_unbounded_aggregation',  label: 'GST: Unbounded Aggregation',    difficulty: 'Medium' },
+  { id: 'gst_n_plus_one',            label: 'GST: N+1 Correlated Query',     difficulty: 'Medium' },
+  { id: 'pds_cartesian',             label: 'PDS: Cartesian Product Fix',    difficulty: 'Medium' },
+  { id: 'mgnrega_wildcard',          label: 'MGNREGA: Wildcard LIKE Fix',    difficulty: 'Medium' },
+  { id: 'pds_n_plus_one',            label: 'PDS: N+1 Beneficiary Query',    difficulty: 'Hard' },
+  { id: 'mgnrega_implicit_cast',     label: 'MGNREGA: Implicit Type Cast',   difficulty: 'Hard' },
+  { id: 'gst_multi_join',            label: 'GST: Multi-Table Join',         difficulty: 'Hard' },
 ]
 
 function DashboardLoader({ label }: { label: string }) {
@@ -94,6 +99,9 @@ export default function DashboardPage() {
 
   const isInitialLoading = !observation && (isLoading || !error)
 
+  const lastScore = stepResult?.reward ?? 0
+  const episodePassed = isEpisodeDone && lastScore >= 0.70
+
   return (
     <>
       {showLevelUp && (
@@ -155,11 +163,15 @@ export default function DashboardPage() {
                 color: '#E8EAF6',
               }}
             >
-              {TASK_OPTIONS.map(task => (
-                <option key={task.id} value={task.id}>
-                  {task.label} ({task.difficulty})
-                </option>
-              ))}
+              {TASK_OPTIONS.map(task => {
+                const dotColor = (d: string) => d === 'Easy' ? '#22c55e' : d === 'Medium' ? '#f59e0b' : '#ef4444'
+                return (
+                  <option key={task.id} value={task.id}>
+                    <span style={{display:'inline-block', width:8, height:8, borderRadius:'50%', background: dotColor(task.difficulty), marginRight:6}} />
+                    {task.label} ({task.difficulty})
+                  </option>
+                )
+              })}
             </select>
 
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -230,28 +242,39 @@ export default function DashboardPage() {
                 </div>
 
                 <AnimatePresence>
-                  {!isEpisodeDone ? (
-                    <QueryEditor
-                      key={observation.task_id}
-                      initialQuery={observation.current_query}
-                      onSubmit={handleSubmit}
-                      isLoading={isLoading}
-                    />
-                  ) : (
-                    <div className="p-6 text-center rounded-xl" style={{ background: 'var(--bg-card)' }}>
-                      <div className="text-xl mb-2">🎉 Episode Complete</div>
+                  {episodePassed && (
+                    <div style={{background:'#14532d', border:'1px solid #22c55e', borderRadius:8, padding:'12px 16px', marginBottom:12, display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                      <span style={{color:'#86efac', fontWeight:600}}>
+                        ✅ Great work! Score: {(lastScore * 100).toFixed(0)}% — You can advance to the next episode
+                      </span>
                       <button
                         onClick={() => void reset()}
-                        className="mt-3 px-5 py-2 rounded-lg"
-                        style={{
-                          background: 'linear-gradient(135deg, #4A90D9, #00D4FF)',
-                          color: '#fff',
-                        }}
+                        style={{background:'#22c55e', color:'#000', border:'none', borderRadius:6, padding:'6px 16px', fontWeight:700, cursor:'pointer'}}
                       >
-                        New Episode
+                        Next Episode →
                       </button>
                     </div>
                   )}
+                  {isEpisodeDone && !episodePassed && (
+                    <div style={{background:'#422006', border:'1px solid #f59e0b', borderRadius:8, padding:'12px 16px', marginBottom:12, display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                      <span style={{color:'#fcd34d', fontWeight:600}}>
+                        ⚠️ Score: {(lastScore * 100).toFixed(0)}% — Try again or pick a different task
+                      </span>
+                      <button
+                        onClick={() => void reset(selectedTask)}
+                        style={{background:'#f59e0b', color:'#000', border:'none', borderRadius:6, padding:'6px 16px', fontWeight:700, cursor:'pointer'}}
+                      >
+                        Retry Task ↺
+                      </button>
+                    </div>
+                  )}
+                  
+                  <QueryEditor
+                    key={observation.task_id}
+                    initialQuery={observation.current_query}
+                    onSubmit={handleSubmit}
+                    isLoading={isLoading}
+                  />
                 </AnimatePresence>
               </>
             ) : isInitialLoading ? (

@@ -36,15 +36,18 @@ class CurriculumEngine:
                 self.current_level = s.get("level", 1)
                 self.recent_scores = s.get("recent_scores", [])
                 self.total_episodes = s.get("total_episodes", 0)
+                self.retry_count = s.get("retry_count", 0)
 
             except (json.JSONDecodeError, OSError):
                 self.current_level = 1
                 self.recent_scores = []
                 self.total_episodes = 0
+                self.retry_count = 0
         else:
             self.current_level = 1
             self.recent_scores = []
             self.total_episodes = 0
+            self.retry_count = 0
 
     def _save_state(self):
         try:
@@ -54,6 +57,7 @@ class CurriculumEngine:
                         "level": self.current_level,
                         "recent_scores": self.recent_scores[-10:],
                         "total_episodes": self.total_episodes,
+                        "retry_count": getattr(self, 'retry_count', 0),
                     },
                     f,
                 )
@@ -67,21 +71,31 @@ class CurriculumEngine:
         self._save_state()
 
     def _evaluate_transition(self):
-        # ── Graduation check ─────────────────────────────────────────────
+        # Graduation: 3 consecutive >= 0.70
         if len(self.recent_scores) >= self.GRADUATE_CONSECUTIVE:
             last_n = self.recent_scores[-self.GRADUATE_CONSECUTIVE:]
             if all(s >= self.GRADUATE_THRESHOLD for s in last_n):
                 if self.current_level < self.MAX_LEVEL:
                     self.current_level += 1
                     self.recent_scores = []
+                    self.retry_count = 0
                     print(f"CURRICULUM: Graduated to Level {self.current_level}")
                 return
 
-        # ── Remediation check ────────────────────────────────────────────
+        # Remediation: 2 consecutive < 0.40
         if len(self.recent_scores) >= self.REMEDIATE_CONSECUTIVE:
             last_n_fail = self.recent_scores[-self.REMEDIATE_CONSECUTIVE:]
             if all(s < self.REMEDIATE_THRESHOLD for s in last_n_fail):
-                if self.current_level > self.MIN_LEVEL:
-                    self.current_level -= 1
+                retry_count = getattr(self, 'retry_count', 0)
+                if retry_count < 1:
+                    # One retry at same level first (like a student getting a second chance)
+                    self.retry_count = retry_count + 1
                     self.recent_scores = []
-                    print(f"CURRICULUM: Stepped down to Level {self.current_level}")
+                    print(f"CURRICULUM: Retrying Level {self.current_level} (attempt {self.retry_count + 1})")
+                else:
+                    # Second failure — drop to lower level
+                    if self.current_level > self.MIN_LEVEL:
+                        self.current_level -= 1
+                        self.recent_scores = []
+                        self.retry_count = 0
+                        print(f"CURRICULUM: Stepped down to Level {self.current_level}")
