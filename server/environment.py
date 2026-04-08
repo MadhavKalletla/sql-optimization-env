@@ -164,9 +164,19 @@ class SQLOptEnvironment:
     # STATE
     # ─────────────────────────────────────────
     def state(self) -> EnvironmentState:
-        if not self._state:
-            raise ValueError("Call reset() first")
-        return self._state
+        if self._state:
+            return self._state
+
+        return EnvironmentState(
+            episode_id="init",
+            current_task_id="none",
+            current_step=0,
+            max_steps=3,
+            curriculum_level=self.curriculum.current_level,
+            episode_rewards=[],
+            total_episodes=self.curriculum.total_episodes,
+            is_running=False,
+        )
 
     # ─────────────────────────────────────────
     # QUERY EXECUTION

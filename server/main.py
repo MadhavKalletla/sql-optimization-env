@@ -7,11 +7,13 @@ GET /health, GET/POST /reset, POST /step, GET /state
 import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from .environment import SQLOptEnvironment
 from .models import SQLOptAction, SQLOptObservation, EnvironmentState, StepResult
@@ -132,6 +134,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
+
 
 # ─────────────────────────────────────────────────────────────
 # UI + HEALTH
@@ -185,12 +195,21 @@ async def domains():
 # OPENENV ENDPOINTS (FIXED)
 # ─────────────────────────────────────────────────────────────
 
+class ResetRequest(BaseModel):
+    task_id: Optional[str] = None
+
 @app.api_route("/reset", methods=["GET", "POST"])
-async def reset(task_id: str = Query(default=None)) -> SQLOptObservation:
+async def reset(
+    task_id_query: Optional[str] = Query(default=None, alias="task_id"),
+    body: Optional[ResetRequest] = Body(default=None),
+) -> SQLOptObservation:
     if env is None:
         raise HTTPException(status_code=500, detail="Environment not initialized")
+
+    resolved = (body.task_id if body else None) or task_id_query
+
     try:
-        return env.reset(task_id=task_id)
+        return env.reset(task_id=resolved)
     except Exception as e:
         print(f"[RESET ERROR] {e}", flush=True)
         raise HTTPException(status_code=500, detail=str(e))

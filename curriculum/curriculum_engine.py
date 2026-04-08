@@ -6,12 +6,13 @@ Curriculum Engine — controls difficulty progression per PDF spec.
 State persists locally.
 """
 
+import os
 import json
 from pathlib import Path
 from .level_config import LEVEL_CONFIG
 
 # ✅ FIX: use local file instead of /tmp (persistent + Docker-safe)
-STATE_FILE = Path("./curriculum_state.json")
+STATE_FILE = Path(os.environ.get("CURRICULUM_STATE_PATH", "/tmp/curriculum_state.json"))
 
 
 class CurriculumEngine:
