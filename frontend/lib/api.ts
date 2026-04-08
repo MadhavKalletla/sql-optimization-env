@@ -3,10 +3,10 @@ import { SQLOptAction, SQLOptObservation, StepResult, EnvironmentState } from '.
 const BASE_URL = ''
 
 const DEFAULT_TIMEOUTS = {
-  reset: 12000,
-  step: 15000,
-  state: 5000,
-  health: 2500,
+  reset: 60000,
+  step: 60000,
+  state: 15000,
+  health: 5000,
 } as const
 
 function isAbortError(error: unknown) {

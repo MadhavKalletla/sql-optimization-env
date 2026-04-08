@@ -304,6 +304,17 @@ export default function DashboardPage() {
             />
           </div>
         </div>
+
+        {/* Interactive 3D Robot - Bottom Left */}
+        <div style={{ position: 'fixed', left: 20, bottom: 20, width: 320, height: 320, zIndex: 10, pointerEvents: 'none' }}>
+          <iframe 
+            src="https://my.spline.design/miniaturecyborgrobot-9133bd5ccca1c9a405fb5ef1ff2dfd91/"
+            width="100%" 
+            height="100%" 
+            frameBorder="0"
+            style={{ pointerEvents: 'auto' }}
+          />
+        </div>
       </div>
     </>
   )
