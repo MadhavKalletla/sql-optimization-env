@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Body
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -118,11 +118,6 @@ def _table_row_counts() -> dict[str, int]:
 async def lifespan(app: FastAPI):
     global env
     env = SQLOptEnvironment()
-
-    static_dir = ROOT / "static"
-    if static_dir.exists():
-        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-
     print("✅ Environment initialized", flush=True)
     yield
 
@@ -142,16 +137,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount /_next/static so Next.js chunks are served correctly
+_next_dir = ROOT / "static" / "_next"
+if _next_dir.exists():
+    app.mount("/_next", StaticFiles(directory=str(_next_dir)), name="nextjs-assets")
+
 
 # ─────────────────────────────────────────────────────────────
 # UI + HEALTH
 # ─────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
-async def dashboard():
-    html_file = ROOT / "static" / "index.html"
-    if html_file.exists():
-        return HTMLResponse(content=html_file.read_text(encoding="utf-8"))
-    return HTMLResponse(content="<h1>SQL Optimization RL Environment</h1><p>Dashboard not found.</p>")
+async def home():
+    f = ROOT / "static" / "index.html"
+    return HTMLResponse(content=f.read_text(encoding="utf-8") if f.exists() else "<h1>Not found</h1>")
+
+@app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/dashboard/", response_class=HTMLResponse, include_in_schema=False)
+async def dashboard_page():
+    f = ROOT / "static" / "dashboard" / "index.html"
+    return HTMLResponse(content=f.read_text(encoding="utf-8") if f.exists() else "<h1>Not found</h1>")
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    f = ROOT / "static" / "favicon.ico"
+    return FileResponse(str(f)) if f.exists() else HTMLResponse("", status_code=404)
 
 
 @app.get("/health")
