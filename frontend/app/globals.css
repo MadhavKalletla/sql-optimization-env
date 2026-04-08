@@ -1,0 +1,59 @@
+/* ✅ Tailwind v4 syntax — replaces @tailwind base/components/utilities */
+@import "tailwindcss";
+
+/* ✅ Custom animations — in v4 these go here, NOT in tailwind.config.ts */
+@theme {
+  --animate-spotlight: spotlight 2s ease .75s 1 forwards;
+  --animate-fade-up: fadeUp 0.6s ease forwards;
+  --animate-slide-in: slideIn 0.4s ease forwards;
+}
+
+@keyframes spotlight {
+  0%   { opacity: 0; transform: translate(-72%, -62%) scale(0.5); }
+  100% { opacity: 1; transform: translate(-50%, -40%) scale(1); }
+}
+
+@keyframes fadeUp {
+  0%   { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  0%   { opacity: 0; transform: translateX(-10px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Design tokens ── */
+:root {
+  --bg-primary:    #0A0B1A;
+  --bg-panel:      #0F1229;
+  --bg-card:       #131528;
+  --accent-blue:   #4A90D9;
+  --accent-cyan:   #00D4FF;
+  --text-primary:  #E8EAF6;
+  --text-muted:    #8892A4;
+  --border-subtle: #1E2140;
+  --reward-green:  #00E676;
+  --reward-yellow: #FFD740;
+  --reward-red:    #FF5252;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── Spinner ── */
+.loader {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-subtle);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

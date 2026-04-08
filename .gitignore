@@ -11,3 +11,4 @@ build/
 /tmp/curriculum_state.json
 create_project.bat
 create_project.bat.txt
+data/fixtures/*.db
