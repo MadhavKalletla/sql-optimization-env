@@ -1,33 +1,50 @@
+# ─────────────────────────────────────────
+# STAGE 1: Build Next.js frontend
+# ─────────────────────────────────────────
+FROM node:20-slim AS frontend-builder
+
+WORKDIR /frontend
+
+# Install dependencies
+COPY frontend/package*.json ./
+RUN npm ci
+
+# Copy frontend source
+COPY frontend/ ./
+
+# Build static export
+RUN npm run build
+
+# ─────────────────────────────────────────
+# STAGE 2: Python backend
+# ─────────────────────────────────────────
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# ─────────────────────────────────────────
-# System dependencies
-# ─────────────────────────────────────────
+# System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# ─────────────────────────────────────────
-# Python dependencies
-# ─────────────────────────────────────────
-COPY requirements.txt .
-
+# Python deps
+COPY requirements.txt ./
 RUN pip install --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# ─────────────────────────────────────────
-# Copy project
-# ─────────────────────────────────────────
+# Copy backend + project
 COPY . .
 
+# 🔥 IMPORTANT: Replace static with built frontend
+COPY --from=frontend-builder /frontend/out/ ./static/
+
+# Allow curriculum state write
 RUN mkdir -p /tmp && chmod 777 /tmp
 
 # ─────────────────────────────────────────
-# Pre-seed database (FIXED ✅)
+# Pre-seed database
 # ─────────────────────────────────────────
 RUN python - <<EOF
 from data.seed_database import seed_database
