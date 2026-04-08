@@ -1,8 +1,7 @@
 import { SQLOptAction, SQLOptObservation, StepResult, EnvironmentState } from './types'
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_ENV_URL ||
-  'https://kalletlamadhav-sql-optimized-env-new.hf.space'
+const BASE_URL = 'https://kalletlamadhav-sql-optimized-env-new.hf.space'
+
 
 const DEFAULT_TIMEOUTS = {
   reset: 12000,

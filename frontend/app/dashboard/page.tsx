@@ -1,5 +1,5 @@
 'use client'
-
+export const dynamic = 'force-static'
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useEnvironment } from '@/hooks/useEnvironment'
@@ -265,10 +265,10 @@ export default function DashboardPage() {
             <RewardRadar reward={stepResult?.reward_detail ?? null} previous={previousReward} />
 
             {observation ? (
-              <ExplainTree 
-                plan={stepResult?.observation.execution_plan ?? observation.execution_plan} 
+              <ExplainTree
+                plan={stepResult?.observation.execution_plan ?? observation.execution_plan}
                 originalPlan={originalPlan ?? undefined}
-                timingMs={stepResult?.observation.execution_time_ms ?? observation.execution_time_ms} 
+                timingMs={stepResult?.observation.execution_time_ms ?? observation.execution_time_ms}
                 originalTimingMs={observation.execution_time_ms}
               />
             ) : (
