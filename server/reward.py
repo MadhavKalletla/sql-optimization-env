@@ -124,12 +124,6 @@ class RewardComposer:
 
         total = round(max(0.0, min(1.0, raw_total)), 4)
 
-        # Detect if agent submitted the original slow query unchanged (normalized)
-        import re
-        def _norm(q): return re.sub(r'\s+', ' ', q.strip().lower())
-        if _norm(action.optimized_query) == _norm(task.slow_query):
-            total = min(total, 0.15)
-
         return SQLOptReward(
             total=total,
             speedup_score=round(self.WEIGHTS["speedup"] * speedup_raw, 4),

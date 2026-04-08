@@ -207,7 +207,7 @@ export default function HomePage() {
 
               <div className="flex flex-wrap gap-4 mt-6">
                 {[
-                  { icon: Database, label: '9 Tasks' },
+                  { icon: Database, label: '12 Tasks' },
                   { icon: BarChart2, label: '5 Difficulty Levels' },
                   { icon: Award, label: '5-Dimension Reward' },
                   { icon: Globe, label: 'Indian Data Domains' }
@@ -250,6 +250,30 @@ export default function HomePage() {
             </div>
           </div>
         </motion.div>
+      </div>
+
+      {/* 3D Robot fixed at bottom-left */}
+      <div
+        style={{
+          position: 'fixed',
+          left: 16,
+          bottom: 16,
+          width: 200,
+          height: 200,
+          zIndex: 50,
+          borderRadius: 16,
+          overflow: 'hidden',
+          boxShadow: '0 0 30px #4A90D930',
+          pointerEvents: 'none',
+        }}
+      >
+        <iframe
+          src="https://my.spline.design/miniaturecyborgrobot-9133bd5ccca1c9a405fb5ef1ff2dfd91/"
+          width="100%"
+          height="100%"
+          frameBorder="0"
+          style={{ pointerEvents: 'auto' }}
+        />
       </div>
     </main>
   )
