@@ -11,6 +11,7 @@ import { CurriculumNode } from '@/components/ui/curriculum-node'
 import { AntiPatternType, LEVEL_LABELS } from '@/lib/types'
 import { EpisodeHistory } from '@/components/dashboard/EpisodeHistory'
 import { LevelUpToast } from '@/components/dashboard/LevelUpToast'
+import { RobotWidget } from '@/components/ui/RobotWidget'
 
 // curriculum_level here means the MINIMUM level required to access this task
 const TASK_OPTIONS = [
@@ -388,29 +389,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ─── 3D ROBOT BOTTOM LEFT ─── */}
-        <div
-          style={{
-            position: 'fixed',
-            left: 16,
-            bottom: 16,
-            width: 200,
-            height: 200,
-            zIndex: 50,
-            borderRadius: 16,
-            overflow: 'hidden',
-            boxShadow: '0 0 30px #4A90D930',
-            pointerEvents: 'none',
-          }}
-        >
-          <iframe
-            src="https://my.spline.design/miniaturecyborgrobot-9133bd5ccca1c9a405fb5ef1ff2dfd91/"
-            width="100%"
-            height="100%"
-            frameBorder="0"
-            style={{ pointerEvents: 'auto' }}
-          />
-        </div>
+        {/* ─── CSS Robot Widget ─── */}
+        <RobotWidget />
       </div>
     </>
   )

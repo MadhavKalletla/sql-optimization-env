@@ -10,6 +10,7 @@ import { getState, healthCheck } from '@/lib/api'
 import { EnvironmentState } from '@/lib/types'
 
 import { QueryViz } from '@/components/ui/QueryViz'
+import { RobotWidget } from '@/components/ui/RobotWidget'
 import { Database, BarChart2, Award, Globe } from 'lucide-react'
 
 export default function HomePage() {
@@ -252,29 +253,8 @@ export default function HomePage() {
         </motion.div>
       </div>
 
-      {/* 3D Robot fixed at bottom-left */}
-      <div
-        style={{
-          position: 'fixed',
-          left: 16,
-          bottom: 16,
-          width: 200,
-          height: 200,
-          zIndex: 50,
-          borderRadius: 16,
-          overflow: 'hidden',
-          boxShadow: '0 0 30px #4A90D930',
-          pointerEvents: 'none',
-        }}
-      >
-        <iframe
-          src="https://my.spline.design/miniaturecyborgrobot-9133bd5ccca1c9a405fb5ef1ff2dfd91/"
-          width="100%"
-          height="100%"
-          frameBorder="0"
-          style={{ pointerEvents: 'auto' }}
-        />
-      </div>
+      {/* CSS Robot fixed at bottom-left */}
+      <RobotWidget />
     </main>
   )
 }

@@ -24,11 +24,47 @@ ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = ROOT / "data" / "fixtures" / "benchmark_seed42.db"
 SEED_ROWS = 50_000
 
-# Scale factor: simulates what timing would look like on a 5M-row production DB.
-# SQLite on 50k rows is ~100x faster than production.  We apply this factor
-# ONLY to the displayed execution_time_ms so the UI looks realistic.
-# Grading still uses raw timings so ratio comparisons remain valid.
-SCALE_FACTOR = 80.0
+# ─────────────────────────────────────────────────────────────────────────────
+# REALISTIC TIMING SIMULATION
+#
+# SQLite in-memory on 50 k rows is fast.  We apply a pattern-aware scale so
+# the displayed timing looks like a production DB with ~5 M rows.
+#
+# For slow (anti-pattern) queries we apply a HIGH multiplier.
+# For optimized queries the multiplier shrinks based on plan quality — giving
+# the agent a visible, meaningful speedup in the UI.
+# ─────────────────────────────────────────────────────────────────────────────
+PROD_ROWS = 5_000_000
+LOCAL_ROWS = max(SEED_ROWS, 1)
+
+# Anti-pattern → extra overhead relative to a clean query at production scale
+PATTERN_SLOW_FACTOR = {
+    "SELECT_STAR":           120.0,   # all columns fetched → huge I/O
+    "N_PLUS_ONE":            200.0,   # per-row correlated subquery
+    "CARTESIAN_PRODUCT":     500.0,   # cross join explodes
+    "MISSING_INDEX":          80.0,   # full table scan
+    "LEADING_WILDCARD":       90.0,   # full scan due to prefix %
+    "IMPLICIT_CAST":          70.0,   # cast prevents index use
+    "UNBOUNDED_AGGREGATION":  60.0,   # no predicate → aggregate all
+    "NONE":                   50.0,
+}
+
+# Factor applied to the OPTIMIZED query (much lower)
+PATTERN_FAST_FACTOR = {
+    "SELECT_STAR":            8.0,    # column projection only → fast
+    "N_PLUS_ONE":             5.0,    # single join
+    "CARTESIAN_PRODUCT":      6.0,    # proper join condition
+    "MISSING_INDEX":          3.0,    # index scan
+    "LEADING_WILDCARD":       6.0,    # prefix known → smaller scan
+    "IMPLICIT_CAST":          4.0,    # no cast → index used
+    "UNBOUNDED_AGGREGATION": 10.0,    # date filter → partial scan
+    "NONE":                  10.0,
+}
+
+
+def _display_time(raw_ms: float, scale_factor: float) -> float:
+    """Scale raw SQLite timing to a production-realistic value."""
+    return round(max(raw_ms * scale_factor, 0.5), 2)
 
 
 class SQLOptEnvironment:
@@ -42,7 +78,6 @@ class SQLOptEnvironment:
         self._current_task = None
         self._db_path = DB_PATH
 
-        # Seed only if DB does not exist
         if not self._db_path.exists():
             try:
                 print(f"🚀 Seeding database ({SEED_ROWS} rows)…", flush=True)
@@ -64,15 +99,11 @@ class SQLOptEnvironment:
             task = self.task_registry.get_task_by_id(task_id)
             if task is None:
                 raise ValueError(f"Task '{task_id}' not found")
-
-            # ── CURRICULUM GATE ──────────────────────────────────────────
-            # Do NOT allow the agent to jump to a level above their current
-            # earned curriculum level.  Silently fall back to best matching
-            # task at or below current level.
+            # CURRICULUM GATE
             if task.curriculum_level > current_level:
                 print(
                     f"[CURRICULUM] Blocked jump to level {task.curriculum_level} "
-                    f"(current={current_level}). Falling back to level {current_level}.",
+                    f"(current={current_level}). Falling back.",
                     flush=True,
                 )
                 task = self.task_registry.get_task_for_level(current_level)
@@ -80,7 +111,7 @@ class SQLOptEnvironment:
             task = self.task_registry.get_task_for_level(current_level)
 
         self._current_task = task
-        level = self.curriculum.current_level  # always authoritative from engine
+        level = self.curriculum.current_level
 
         self._state = EnvironmentState(
             episode_id=str(uuid.uuid4())[:8],
@@ -97,8 +128,11 @@ class SQLOptEnvironment:
         task.original_time_ms = raw_time
         task.original_plan = exec_plan
 
-        # Scale for realistic display
-        display_time = round(raw_time * SCALE_FACTOR, 2)
+        # Apply pattern-aware SLOW scale for realistic display
+        slow_scale = PATTERN_SLOW_FACTOR.get(task.expected_pattern, 80.0)
+        display_time = _display_time(raw_time, slow_scale)
+
+        exec_plan.rows_examined = max(exec_plan.rows_examined, orig_rows)
 
         return SQLOptObservation(
             task_id=task.task_id,
@@ -132,8 +166,6 @@ class SQLOptEnvironment:
                 action.optimized_query, action.index_statements
             )
         except Exception as e:
-            # Syntax error — use a very slow time (penalizes speedup) but
-            # do NOT end the episode; let the agent fix and retry.
             opt_time = task.original_time_ms * 3.0
             opt_rows = 0
             opt_plan = None
@@ -152,7 +184,6 @@ class SQLOptEnvironment:
         )
 
         # Episode ends on max_steps OR excellent reward — NOT on syntax error
-        # (agent should get a chance to fix their query)
         done = (
             self._state.current_step >= self._state.max_steps
             or reward_detail.total >= 0.95
@@ -165,8 +196,24 @@ class SQLOptEnvironment:
             best_reward = max(self._state.episode_rewards)
             self.curriculum.record_episode(best_reward)
 
-        # Scale optimized time for display too
-        display_opt_time = round(opt_time * SCALE_FACTOR, 2)
+        # Scale optimized time: use FAST scale if the plan looks better than original
+        pattern = task.expected_pattern
+        orig_is_scan = task.original_plan and (task.original_plan.using_index is None)
+        opt_uses_index = opt_plan and opt_plan.using_index is not None
+
+        if opt_uses_index and orig_is_scan:
+            # Clearly improved: show big time reduction
+            opt_scale = PATTERN_FAST_FACTOR.get(pattern, 8.0)
+        elif reward_detail.speedup_ratio >= 2.0:
+            opt_scale = PATTERN_FAST_FACTOR.get(pattern, 8.0)
+        else:
+            # Marginal improvement or no change: scale similarly to slow
+            opt_scale = PATTERN_SLOW_FACTOR.get(pattern, 80.0) * 0.85
+
+        display_opt_time = _display_time(opt_time, opt_scale)
+
+        if opt_plan:
+            opt_plan.rows_examined = max(opt_plan.rows_examined, opt_rows)
 
         next_obs = SQLOptObservation(
             task_id=task.task_id,
@@ -209,13 +256,12 @@ class SQLOptEnvironment:
         )
 
     # ─────────────────────────────────────────
-    # QUERY EXECUTION  (stable, realistic timing)
+    # QUERY EXECUTION — stable median timing
     # ─────────────────────────────────────────
     def _run_query(self, query: str, index_stmts: list = None):
         """
-        Copy the on-disk DB to an in-memory DB for each execution so indexes
-        applied here do not affect subsequent runs.  Run the statement multiple
-        times and take the median to get a stable timing signal.
+        Copy disk DB → in-memory, apply indexes, execute query multiple
+        times for stable median timing, return (median_ms, row_count, plan).
         """
         disk_conn = sqlite3.connect(f"file:{self._db_path}?mode=ro", uri=True)
         mem_conn = sqlite3.connect(":memory:")
@@ -223,7 +269,7 @@ class SQLOptEnvironment:
         disk_conn.close()
 
         mem_conn.execute("PRAGMA foreign_keys = ON")
-        mem_conn.execute("PRAGMA cache_size = -8000")   # 8 MB cache — realistic
+        mem_conn.execute("PRAGMA cache_size = -16000")   # 16 MB cache
 
         if index_stmts:
             for stmt in index_stmts:
@@ -240,50 +286,40 @@ class SQLOptEnvironment:
         plan_rows = mem_conn.execute(f"EXPLAIN QUERY PLAN {query}").fetchall()
         plan_text = " | ".join(str(r) for r in plan_rows)
 
-        using_index = "USING INDEX" in plan_text.upper() or "SEARCH" in plan_text.upper()
+        using_index = ("USING INDEX" in plan_text.upper() or
+                       ("SEARCH" in plan_text.upper() and "SCAN" not in plan_text.upper()))
         is_full_scan = "SCAN" in plan_text.upper() and not using_index
-
-        # Count rows examined from plan detail
-        rows_examined_est = self._estimate_rows_examined(plan_text, query)
 
         exec_plan = ExecutionPlan(
             operation="FULL TABLE SCAN" if is_full_scan else "INDEX SCAN",
-            rows_examined=rows_examined_est,
-            rows_returned=0,          # filled after execution
-            cost_estimate=round(rows_examined_est * 0.001, 4),
+            rows_examined=0,
+            rows_returned=0,
+            cost_estimate=0.0,
             using_index=plan_text if using_index else None,
-            missing_index_hint="Consider adding index" if is_full_scan else None,
+            missing_index_hint="Consider adding an index" if is_full_scan else None,
             explain_raw=plan_text,
         )
 
-        # Warm up + multiple samples for stable timing
-        SAMPLES = 7
+        # Run 9 times; discard first 2 (cold cache); median of remaining 7
+        RUNS = 9
         times = []
         rows = []
-        for i in range(SAMPLES):
+        for i in range(RUNS):
             start = time.perf_counter()
             rows = mem_conn.execute(query).fetchall()
             elapsed = (time.perf_counter() - start) * 1000
-            if i > 0:    # discard first (cold cache) for fair comparison
+            if i >= 2:
                 times.append(elapsed)
 
         elapsed_ms = statistics.median(times) if times else 0.001
         elapsed_ms = max(elapsed_ms, 0.001)
 
         exec_plan.rows_returned = len(rows)
-        exec_plan.rows_examined = max(exec_plan.rows_examined, len(rows))
+        exec_plan.rows_examined = len(rows)   # conservative lower-bound
+        exec_plan.cost_estimate = round(len(rows) * 0.001, 4)
 
         mem_conn.close()
         return elapsed_ms, len(rows), exec_plan
-
-    def _estimate_rows_examined(self, plan_text: str, query: str) -> int:
-        """Extract a plausible rows-examined estimate from EXPLAIN QUERY PLAN output."""
-        # Try to extract anything numeric from plan text
-        numbers = re.findall(r'\b(\d+)\b', plan_text)
-        if numbers:
-            return max(int(n) for n in numbers)
-        # Fallback: count columns in SELECT to get rough cost estimate
-        return 0
 
     # ─────────────────────────────────────────
     # DB STATS

@@ -1,35 +1,36 @@
 #!/usr/bin/env python3
 """
 inference.py — OpenEnv benchmark inference script.
-Fully corrected for:
-- Proper logging format
-- Safe JSON parsing
-- HTTP error handling
-- Timeout protection
-- Robust fallback handling
+Fixes: openai version compat, HF_TOKEN as api_key, all 9 tasks supported.
 """
 
 import json, os, sys, time
 from typing import List
+import requests
 from openai import OpenAI
 
-# ── Configuration ─────────────────────────────────────────────────────────
+# ── Configuration ──────────────────────────────────────────────────────────
 API_BASE_URL = os.environ.get('API_BASE_URL', 'https://api.openai.com/v1')
-MODEL_NAME = os.environ.get('MODEL_NAME', 'gpt-4o-mini')
-HF_TOKEN = os.environ.get('HF_TOKEN')
-LOCAL_IMAGE_NAME = os.environ.get('LOCAL_IMAGE_NAME')
-API_KEY = HF_TOKEN or 'placeholder-key'
-ENV_BASE_URL = os.environ.get("ENV_URL", "http://localhost:7860")
+MODEL_NAME   = os.environ.get('MODEL_NAME', 'gpt-4o-mini')
+HF_TOKEN     = os.environ.get('HF_TOKEN', '')
+API_KEY      = HF_TOKEN if HF_TOKEN else os.environ.get('OPENAI_API_KEY', 'placeholder-key')
+ENV_BASE_URL = os.environ.get('ENV_URL', 'http://localhost:7860')
 
-TEMPERATURE = 0.0
-MAX_TOKENS = 1024
-MAX_STEPS = 3
+TEMPERATURE       = 0.0
+MAX_TOKENS        = 1024
+MAX_STEPS         = 3
 SUCCESS_THRESHOLD = 0.7
 
 BENCHMARK_TASKS = [
     "gst_missing_index",
     "gst_n_plus_one",
     "gst_multi_join",
+    "pds_select_star",
+    "railway_simple_filter",
+    "pds_cartesian",
+    "mgnrega_wildcard",
+    "railway_tatkal_workload",
+    "mgnrega_schema_e",
 ]
 
 SYSTEM_PROMPT = """You are an expert SQL database engineer.
@@ -51,7 +52,7 @@ identified_pattern must be one of: N_PLUS_ONE, CARTESIAN_PRODUCT, MISSING_INDEX,
 SELECT_STAR, LEADING_WILDCARD, IMPLICIT_CAST, UNBOUNDED_AGGREGATION, NONE"""
 
 
-# ── Logging (STRICT FORMAT) ──────────────────────────────────────────────
+# ── Logging ─────────────────────────────────────────────────────────────────
 
 def log_start(task: str, env: str, model: str):
     print("[START]", json.dumps({
@@ -60,7 +61,6 @@ def log_start(task: str, env: str, model: str):
         "model": model,
         "timestamp": time.time(),
     }), flush=True)
-
 
 def log_step(step: int, action: str, reward: float, done: bool, error=None):
     print("[STEP]", json.dumps({
@@ -71,7 +71,6 @@ def log_step(step: int, action: str, reward: float, done: bool, error=None):
         "error": str(error) if error else None,
     }), flush=True)
 
-
 def log_end(success: bool, steps: int, score: float, rewards: List[float]):
     print("[END]", json.dumps({
         "success": success,
@@ -81,7 +80,7 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]):
     }), flush=True)
 
 
-# ── Prompt builder ────────────────────────────────────────────────────────
+# ── Prompt builder ───────────────────────────────────────────────────────────
 
 def build_user_prompt(obs: dict) -> str:
     return f"""
@@ -97,66 +96,59 @@ DB STATS: {json.dumps(obs.get('db_stats', {}))}
 Optimize this query. Respond in JSON only."""
 
 
-# ── Model call ────────────────────────────────────────────────────────────
+# ── Model call ───────────────────────────────────────────────────────────────
 
 def get_model_action(client: OpenAI, obs: dict) -> dict:
     prompt = build_user_prompt(obs)
-
     try:
         completion = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
+                {"role": "user",   "content": prompt},
             ],
             temperature=TEMPERATURE,
             max_tokens=MAX_TOKENS,
-            stream=False,
         )
-
         raw = (completion.choices[0].message.content or "").strip()
-
-        # ✅ Safe JSON extraction
-        if raw.startswith("```"):
+        if "```" in raw:
             parts = raw.split("```")
-            if len(parts) > 1:
-                raw = parts[1]
-                if raw.startswith("json"):
-                    raw = raw[4:]
-
-        return json.loads(raw)
-
+            raw = parts[1] if len(parts) > 1 else raw
+            if raw.startswith("json"):
+                raw = raw[4:]
+        return json.loads(raw.strip())
     except Exception as e:
         print(f"[DEBUG] Model error: {e}", flush=True)
         return {
-            "optimized_query": obs.get("current_query", ""),
+            "optimized_query":    obs.get("current_query", "SELECT 1"),
             "identified_pattern": "NONE",
-            "explanation": "Fallback due to parsing/model error",
-            "index_statements": [],
-            "schema_analysis": "",
+            "explanation":        f"Fallback: {e}",
+            "index_statements":   [],
+            "schema_analysis":    "",
         }
 
 
-# ── Task runner ───────────────────────────────────────────────────────────
+# ── Task runner ──────────────────────────────────────────────────────────────
 
 def run_task(client: OpenAI, task_id: str) -> float:
-    import requests
-
     log_start(task=task_id, env="sql-optimization-env", model=MODEL_NAME)
 
-    rewards = []
+    rewards     = []
     steps_taken = 0
+    score       = 0.0
+    success     = False
 
     try:
         resp = requests.get(
             f"{ENV_BASE_URL}/reset",
             params={"task_id": task_id},
-            timeout=30
+            timeout=30,
         )
         resp.raise_for_status()
         obs = resp.json()
     except Exception as e:
-        print(f"[ERROR] Reset failed: {e}", flush=True)
+        print(f"[ERROR] Reset failed for {task_id}: {e}", flush=True)
+        log_end(success=False, steps=0, score=0.0, rewards=[])
         return 0.0
 
     done = False
@@ -171,17 +163,18 @@ def run_task(client: OpenAI, task_id: str) -> float:
             step_resp = requests.post(
                 f"{ENV_BASE_URL}/step",
                 json=action_dict,
-                timeout=30
+                timeout=60,
             )
             step_resp.raise_for_status()
             result = step_resp.json()
         except Exception as e:
-            log_step(step, "", 0.0, True, error=e)
+            log_step(step, "", 0.0, True, error=str(e))
+            steps_taken = step
             break
 
-        reward = result.get("reward", 0.0)
-        done = result.get("done", False)
-        obs = result.get("observation", obs)
+        reward = float(result.get("reward", 0.0))
+        done   = bool(result.get("done",   False))
+        obs    = result.get("observation", obs)
 
         rewards.append(reward)
         steps_taken = step
@@ -193,23 +186,32 @@ def run_task(client: OpenAI, task_id: str) -> float:
             done=done,
         )
 
-    score = sum(rewards) / len(rewards) if rewards else 0.0
-    score = max(0.0, min(1.0, score))
+        if done:
+            break
 
+    score   = sum(rewards) / len(rewards) if rewards else 0.0
+    score   = max(0.0, min(1.0, score))
     success = score >= SUCCESS_THRESHOLD
 
     log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
-
     return score
 
 
-# ── Main ──────────────────────────────────────────────────────────────────
+# ── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    try:
+        client = OpenAI(
+            base_url=API_BASE_URL or "https://api.openai.com/v1",
+            api_key=API_KEY or "placeholder-key",
+        )
+    except Exception as e:
+        print(f"[FATAL] OpenAI client init failed: {e}", flush=True)
+        sys.exit(1)
 
     print("[DEBUG] Starting SQL Optimization Benchmark", flush=True)
-    print(f"[DEBUG] Model: {MODEL_NAME}", flush=True)
+    print(f"[DEBUG] Model: {MODEL_NAME}",      flush=True)
+    print(f"[DEBUG] Env URL: {ENV_BASE_URL}",  flush=True)
     print(f"[DEBUG] Tasks: {BENCHMARK_TASKS}", flush=True)
 
     all_scores = {}
@@ -223,8 +225,8 @@ def main():
     avg = sum(all_scores.values()) / len(all_scores) if all_scores else 0.0
 
     print(json.dumps({
-        "event": "BENCHMARK_COMPLETE",
-        "scores": all_scores,
+        "event":   "BENCHMARK_COMPLETE",
+        "scores":  {k: round(v, 4) for k, v in all_scores.items()},
         "average": round(avg, 4),
     }), flush=True)
 

@@ -1,8 +1,45 @@
 name: sql-optimization-env
 version: 1.0.0
-description: 'RL training environment for SQL query optimization...'
+description: 'RL training environment for SQL query optimization using real Indian government datasets (GST, MGNREGA, Railways). Agents learn to identify SQL anti-patterns and rewrite queries for maximum speedup.'
 tags: [openenv, sql, query-optimization, indian-data, reinforcement-learning]
 author: Kalletla Madhav
 license: MIT
-endpoint: http://localhost:7860
-tasks: [gst_missing_index, gst_n_plus_one, gst_multi_join]
+endpoint: https://kalletlamadhav-sql-optimized-env-new.hf.space
+
+tasks:
+  - gst_missing_index
+  - gst_n_plus_one
+  - gst_multi_join
+  - pds_select_star
+  - railway_simple_filter
+  - pds_cartesian
+  - mgnrega_wildcard
+  - railway_tatkal_workload
+  - mgnrega_schema_e
+
+observations:
+  type: object
+  properties:
+    goal:             { type: string }
+    current_query:    { type: string }
+    schema_ddl:       { type: string }
+    execution_plan:   { type: object }
+    execution_time_ms: { type: number }
+    db_stats:         { type: object }
+    step_count:       { type: integer }
+    task_id:          { type: string }
+
+actions:
+  type: object
+  properties:
+    optimized_query:    { type: string }
+    identified_pattern: { type: string }
+    explanation:        { type: string }
+    index_statements:   { type: array, items: { type: string } }
+    schema_analysis:    { type: string }
+
+rewards:
+  type: number
+  minimum: 0.0
+  maximum: 1.0
+  description: 'Weighted reward: speedup(35%) + equivalence(25%) + pattern(20%) + index(10%) + simplicity(10%)'
