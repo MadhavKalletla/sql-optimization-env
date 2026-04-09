@@ -14,12 +14,14 @@ class AntiPatternGrader:
 
         expected = task.expected_pattern
 
-        # ✅ FIX: Safe handling of identified pattern
-        identified = (
-            action.identified_pattern.value
-            if action.identified_pattern is not None
-            else "NONE"
-        )
+        # Safe handling: frontend may send a plain string instead of an enum.
+        raw = action.identified_pattern
+        if raw is None:
+            identified = "NONE"
+        elif isinstance(raw, str):
+            identified = raw
+        else:
+            identified = raw.value  # it's an AntiPatternType enum
 
         # 40 % for correct identification
         if identified == expected:
@@ -50,9 +52,9 @@ class AntiPatternGrader:
         if not explanation:
             return 0.0
 
-        # UI sends "Manual" by contract; do not penalize this placeholder.
+        # "Manual" means the user chose not to explain — partial credit only.
         if explanation.strip().lower() == "manual":
-            return 1.0
+            return 0.5
 
         keywords = {
             "N_PLUS_ONE": ["correlated", "subquery", "per row", "n+1", "loop", "join"],
@@ -81,7 +83,7 @@ class AntiPatternGrader:
             return 1.0
         if pattern == "MISSING_INDEX" and action.index_statements:
             return 1.0
-        if pattern == "LEADING_WILDCARD" and "LIKE '%%" not in opt:
+        if pattern == "LEADING_WILDCARD" and "LIKE '%" not in opt:
             return 0.8
         if pattern == "IMPLICIT_CAST" and "CAST" not in opt:
             return 1.0

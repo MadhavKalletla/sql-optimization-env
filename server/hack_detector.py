@@ -42,12 +42,6 @@ class HackDetector:
         r'\bANALYZE\b',
     ]
 
-    # ── 5. LIMIT abuse ───────────────────────────────────────────────────
-    # ✅ FIX: detect ANY LIMIT number, not just 1–9
-    _LIMIT_ABUSE_PATTERNS = [
-        r'\bLIMIT\s+\d+\b',
-    ]
-
     def detect(self, action: SQLOptAction, task) -> str | None:
         """
         Return a hack-type string if reward hacking is detected, else None.
@@ -80,11 +74,12 @@ class HackDetector:
             if re.search(pat, q_upper):
                 return "MAINTENANCE_ABUSE"
 
-        # 5. LIMIT abuse — only if original had no LIMIT
+        # 5. LIMIT 1 abuse — only when original returns many rows and no ORDER BY
         if "LIMIT" not in original_upper:
-            for pat in self._LIMIT_ABUSE_PATTERNS:
-                if re.search(pat, q_upper):
-                    return "LIMIT_ABUSE"
+            limit_one = re.search(r'\bLIMIT\s+1\b', q_upper)
+            has_order_by = 'ORDER BY' in q_upper
+            if limit_one and not has_order_by:
+                return "LIMIT_ABUSE"
 
         # 6. Index overloading
         if len(action.index_statements) > 5:

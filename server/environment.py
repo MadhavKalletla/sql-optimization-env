@@ -177,6 +177,7 @@ class SQLOptEnvironment:
             orig_time=task.original_time_ms,
             opt_time=opt_time,
             opt_rows=opt_rows,
+            orig_plan=task.original_plan,
             opt_plan=opt_plan,
             hack=hack,
             query_error=query_error,
@@ -315,8 +316,20 @@ class SQLOptEnvironment:
         elapsed_ms = max(elapsed_ms, 0.001)
 
         exec_plan.rows_returned = len(rows)
-        exec_plan.rows_examined = len(rows)   # conservative lower-bound
-        exec_plan.cost_estimate = round(len(rows) * 0.001, 4)
+        # Rows examined estimated from plan text — SCAN means full table, SEARCH means indexed
+        if "SCAN" in plan_text.upper() and "SEARCH" not in plan_text.upper():
+            # Full scan: examined ≈ total table rows (approximate from db stats)
+            try:
+                tbl_name = query.strip().upper().split("FROM")[1].split()[0].strip(";, ")
+                examined = mem_conn.execute(
+                    f"SELECT COUNT(*) FROM {tbl_name}"
+                ).fetchone()[0]
+            except Exception:
+                examined = len(rows) * 100  # fallback estimate
+        else:
+            examined = len(rows)  # index scan: examined ≈ returned
+        exec_plan.rows_examined = examined
+        exec_plan.cost_estimate = round(examined * 0.001, 4)
 
         mem_conn.close()
         return elapsed_ms, len(rows), exec_plan
