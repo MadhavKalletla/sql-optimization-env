@@ -72,7 +72,15 @@ class RewardComposer:
                 hack_type=hack,
             )
 
-        # ── 1. Speedup Score ─────────────────────────────────────────────
+        # ── 1. Equivalence Score ─────────────────────────────────────────
+        equiv_raw = self.equiv_grader.grade(
+            task, action.optimized_query, db_path=db_path
+        )
+
+        if equiv_raw < 0.5:
+            penalty += self.PENALTIES["wrong_results"]
+
+        # ── 2. Speedup Score ─────────────────────────────────────────────
         speedup_raw = self.speedup_grader.grade(
             orig_time,
             opt_time,
@@ -108,13 +116,13 @@ class RewardComposer:
         if speedup_ratio < 1.0 and speedup_raw == 0.05:
             penalty += self.PENALTIES["slower_query"]
 
-        # ── 2. Equivalence Score ─────────────────────────────────────────
-        equiv_raw = self.equiv_grader.grade(
-            task, action.optimized_query, db_path=db_path
-        )
+        # 🚨 NULLIFY SPEEDUP IF QUERY IS WRONG ────────────────────────────
+        # If the query is fundamentally incorrect, any "speedup" is just because 
+        # it returned fewer rows or did less work. Don't reward or display it!
+        if equiv_raw < 0.8:
+            speedup_raw = 0.0
+            speedup_ratio = 1.0
 
-        if equiv_raw < 0.5:
-            penalty += self.PENALTIES["wrong_results"]
 
         # ── 3. Anti-pattern Score ────────────────────────────────────────
         pattern_raw = self.pattern_grader.grade(task, action)

@@ -12,6 +12,7 @@ import { EnvironmentState } from '@/lib/types'
 import { QueryViz } from '@/components/ui/QueryViz'
 import { RobotWidget } from '@/components/ui/RobotWidget'
 import { Database, BarChart2, Award, Globe } from 'lucide-react'
+import { WhyOptimizationMatters } from '@/components/ui/WhyOptimizationMatters'
 
 export default function HomePage() {
   const [envState, setEnvState] = useState<EnvironmentState | null>(null)
@@ -246,15 +247,17 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="flex-1 min-h-[320px] lg:min-h-full">
-              <QueryViz />
+              <div className="flex-1 min-h-[320px] lg:min-h-full">
+                <QueryViz />
+              </div>
             </div>
-          </div>
-        </motion.div>
-      </div>
+          </motion.div>
+        </div>
 
-      {/* CSS Robot fixed at bottom-left */}
-      <RobotWidget />
-    </main>
-  )
-}
+        <WhyOptimizationMatters />
+
+        {/* CSS Robot fixed at bottom-left */}
+        <RobotWidget />
+      </main>
+    )
+  }
