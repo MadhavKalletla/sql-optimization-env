@@ -70,6 +70,7 @@ export interface EnvironmentState {
   episode_rewards: number[];
   total_episodes: number;
   is_running: boolean;
+  recent_scores: number[];
 }
 
 export const ANTI_PATTERN_LABELS: Record<AntiPatternType, string> = {
