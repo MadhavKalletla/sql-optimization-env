@@ -73,7 +73,7 @@ export default function DashboardPage() {
   const [lockedWarning, setLockedWarning] = useState<string | null>(null)
   const didInitializeRef = useRef(false)
   const [hintLevel, setHintLevel] = useState(0)
-  const hintTimerRef = useRef<number[]>([])
+  const hintTimerRef = useRef<NodeJS.Timeout[]>([])
 
   const currentLevel = envState?.curriculum_level ?? 1
 
