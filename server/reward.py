@@ -74,7 +74,11 @@ class RewardComposer:
 
         # ── 1. Speedup Score ─────────────────────────────────────────────
         speedup_raw = self.speedup_grader.grade(
-            orig_time, opt_time, orig_plan=orig_plan, opt_plan=opt_plan
+            orig_time,
+            opt_time,
+            orig_plan=orig_plan,
+            opt_plan=opt_plan,
+            task_pattern=getattr(task, 'expected_pattern', None),
         )
 
         # Compute display speedup ratio using pattern-scaled times for meaningful UI value

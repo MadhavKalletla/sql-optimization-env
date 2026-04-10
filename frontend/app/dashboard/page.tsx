@@ -6,6 +6,7 @@ import { useEnvironment } from '@/hooks/useEnvironment'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { QueryEditor } from '@/components/dashboard/QueryEditor'
 import { RewardRadar } from '@/components/dashboard/RewardRadar'
+import { QueryDiff } from '@/components/dashboard/QueryDiff'
 import { ExplainTree } from '@/components/dashboard/ExplainTree'
 import { CurriculumNode } from '@/components/ui/curriculum-node'
 import { AntiPatternType, LEVEL_LABELS } from '@/lib/types'
@@ -67,25 +68,42 @@ export default function DashboardPage() {
 
   const { envState, isBackendOnline, isRefreshing } = useCurriculum(8000)
   const [selectedTask, setSelectedTask] = useState('pds_select_star')
-  const [prevLevel, setPrevLevel] = useState(1)
+  const [prevLevel, setPrevLevel] = useState<number | null>(null)
   const [showLevelUp, setShowLevelUp] = useState(false)
   const [lockedWarning, setLockedWarning] = useState<string | null>(null)
   const didInitializeRef = useRef(false)
+  const [hintLevel, setHintLevel] = useState(0)
+  const hintTimerRef = useRef<number[]>([])
 
   const currentLevel = envState?.curriculum_level ?? 1
 
   useEffect(() => {
+    if (prevLevel === null) {
+      setPrevLevel(envState?.curriculum_level ?? 1)
+      return
+    }
+
     if (envState?.curriculum_level && envState.curriculum_level > prevLevel) {
       setShowLevelUp(true)
       setPrevLevel(envState.curriculum_level)
     }
-  }, [envState?.curriculum_level, prevLevel])
+  }, [envState?.curriculum_level])
 
   useEffect(() => {
     if (didInitializeRef.current) return
     didInitializeRef.current = true
     void reset(selectedTask)
   }, [reset, selectedTask])
+
+  useEffect(() => {
+    setHintLevel(0)
+    hintTimerRef.current.forEach(t => clearTimeout(t))
+    hintTimerRef.current = [
+      setTimeout(() => setHintLevel(1), 30000),
+      setTimeout(() => setHintLevel(2), 60000),
+    ]
+    return () => hintTimerRef.current.forEach(t => clearTimeout(t))
+  }, [observation?.task_id])
 
   const handleTaskChange = async (taskId: string) => {
     const task = TASK_OPTIONS.find(t => t.id === taskId)
@@ -104,6 +122,12 @@ export default function DashboardPage() {
     explanation: string,
     indexes: string[]
   ) => {
+    hintTimerRef.current.forEach(t => clearTimeout(t))
+    setHintLevel(0)
+    hintTimerRef.current = [
+      setTimeout(() => setHintLevel(1), 30000),
+      setTimeout(() => setHintLevel(2), 60000),
+    ]
     await step(query, pattern, explanation, indexes)
   }
 
@@ -111,11 +135,27 @@ export default function DashboardPage() {
   const lastScore = stepResult?.reward ?? 0
   const episodePassed = isEpisodeDone && lastScore >= 0.70
 
+  const autoAdvanceRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (episodePassed) {
+      autoAdvanceRef.current = window.setTimeout(() => {
+        void reset()
+      }, 3000)
+    }
+
+    return () => {
+      if (autoAdvanceRef.current) {
+        clearTimeout(autoAdvanceRef.current)
+      }
+    }
+  }, [episodePassed, reset])
+
   return (
     <>
       {showLevelUp && (
         <LevelUpToast
-          fromLevel={prevLevel}
+          fromLevel={prevLevel ?? 1}
           toLevel={envState?.curriculum_level ?? 1}
           onDismiss={() => setShowLevelUp(false)}
         />
@@ -266,13 +306,15 @@ export default function DashboardPage() {
                   <p className="text-sm leading-relaxed">{observation.goal}</p>
                 </div>
 
-                {observation.anti_pattern_hint && (
-                  <div
-                    className="p-5 rounded-xl"
-                    style={{ background: 'var(--bg-card)', border: '1px solid #4A90D930' }}
-                  >
-                    <div className="text-xs font-bold mb-2" style={{ color: '#4A90D9' }}>💡 HINT</div>
-                    <p className="text-sm">{observation.anti_pattern_hint}</p>
+                {hintLevel >= 1 && observation.anti_pattern_hint && (
+                  <div className="mt-3 p-3 rounded-lg text-xs" style={{ background: '#1e293b', color: '#cbd5e1' }}>
+                    ■ HINT {hintLevel === 1 ? '1' : '1 + 2'} (unlocked after {hintLevel === 1 ? '30' : '60'}s)
+                    <div className="mt-1">{observation.anti_pattern_hint}</div>
+                    {hintLevel >= 2 && (
+                      <div className="mt-2 text-[10px]" style={{ color: '#94a3b8' }}>
+                        Bonus: Try the Detected Anti-pattern dropdown — selecting correctly gives +20% score.
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -320,7 +362,7 @@ export default function DashboardPage() {
                       style={{ background: '#14532d', border: '1px solid #22c55e', borderRadius: 8, padding: '12px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                     >
                       <span style={{ color: '#86efac', fontWeight: 600 }}>
-                        ✅ Score: {(lastScore * 100).toFixed(0)}% — Excellent! You've earned the next level.
+                        ✅ Score: {(lastScore * 100).toFixed(0)}% — Excellent! Auto-advancing in 3 seconds...
                       </span>
                       <button
                         onClick={() => void reset()}
@@ -358,6 +400,13 @@ export default function DashboardPage() {
                     onSubmit={handleSubmit}
                     isLoading={isLoading}
                   />
+
+                  {stepResult && observation && (
+                    <QueryDiff
+                      original={observation.current_query}
+                      optimized={stepResult.observation.current_query}
+                    />
+                  )}
                 </AnimatePresence>
               </>
             ) : isInitialLoading ? (

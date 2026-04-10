@@ -235,6 +235,28 @@ async def step(action: SQLOptAction) -> StepResult:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/validate")
+async def validate_sql(body: dict = Body(...)):
+    query = body.get("query", "").strip()
+
+    if not query:
+        return {"valid": False, "error": "Empty query"}
+
+    if env is None:
+        return {"valid": False, "error": "Environment not initialized"}
+
+    try:
+        db_path = env._db_path
+        conn = sqlite3.connect(str(db_path))
+        conn.execute(f"EXPLAIN {query}")
+        conn.close()
+
+        return {"valid": True, "error": None}
+
+    except sqlite3.Error as e:
+        return {"valid": False, "error": str(e)}
+
+
 @app.get("/state")
 async def state() -> EnvironmentState:
     if env is None:
@@ -265,3 +287,21 @@ async def list_tasks():
     except Exception as e:
         print(f"[TASK ERROR] {e}", flush=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/curriculum/export")
+async def export_curriculum():
+    import json
+
+    if env is None:
+        return {"state": "{}"}
+
+    c = env.curriculum
+
+    return {
+        "state": json.dumps({
+            "level": c.current_level,
+            "recent_scores": c.recent_scores,
+            "total_episodes": c.total_episodes,
+        })
+    }

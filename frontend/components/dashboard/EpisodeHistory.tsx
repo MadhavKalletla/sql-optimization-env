@@ -2,6 +2,15 @@
 
 import { AnimatePresence, motion } from 'framer-motion'
 import { StepResult } from '@/lib/types'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  ResponsiveContainer,
+  Tooltip,
+  ReferenceLine,
+} from 'recharts'
 
 interface EpisodeHistoryProps {
   history: StepResult[]
@@ -22,6 +31,41 @@ export function EpisodeHistory({ history, currentLevel }: EpisodeHistoryProps) {
       <div className="text-xs font-bold mb-4" style={{ color: 'var(--text-muted)' }}>
         EPISODE HISTORY
       </div>
+
+      {history.length > 1 && (
+        <div
+          className="p-4 rounded-xl mb-4"
+          style={{
+            background: '#0f172a',
+            border: '1px solid #1e2140',
+          }}
+        >
+          <div className="text-xs font-bold mb-2" style={{ color: 'var(--text-muted)' }}>
+            SCORE PROGRESSION
+          </div>
+
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart
+              data={history.map((s, i) => ({
+                step: i + 1,
+                score: Math.round(s.reward * 100),
+              }))}
+            >
+              <XAxis dataKey="step" stroke="#64748b" />
+              <YAxis domain={[0, 100]} stroke="#64748b" />
+              <Tooltip formatter={(v) => [`${v ?? 0}%`, 'Score']} />
+              <ReferenceLine y={70} stroke="#00E676" strokeDasharray="3 3" />
+              <Line
+                type="monotone"
+                dataKey="score"
+                stroke="#4A90D9"
+                strokeWidth={2}
+                dot={{ r: 3 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       <div className="space-y-3">
         <AnimatePresence>
@@ -60,9 +104,20 @@ export function EpisodeHistory({ history, currentLevel }: EpisodeHistoryProps) {
 
                   <div className="flex flex-col">
                     <span style={{ color: 'var(--text-muted)' }}>Pattern</span>
-                    <span className="font-bold text-[10px]" style={{ color: reward.hack_detected ? '#FF5252' : '#E040FB' }}>
-                      {reward.hack_detected ? 'HACK DETECTED' : (step.info?.identified_pattern as string || 'N/A')}
-                    </span>
+                    {reward.hack_detected ? (
+                      <span className="font-bold text-[10px] leading-tight" style={{ color: '#FF5252' }}>
+                        HACK DETECTED<br/>
+                        ({reward.hack_type})
+                      </span>
+                    ) : reward.pattern_score > 0 ? (
+                      <span className="font-bold text-[10px]" style={{ color: '#E040FB' }}>
+                        CORRECT ({(reward.pattern_score / 0.20 * 100).toFixed(0)}%)
+                      </span>
+                    ) : (
+                      <span className="font-bold text-[10px]" style={{ color: '#FF5252' }}>
+                        WRONG (0%)
+                      </span>
+                    )}
                   </div>
                   
                   {step.done && (

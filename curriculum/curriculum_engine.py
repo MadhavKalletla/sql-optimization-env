@@ -28,41 +28,55 @@ class CurriculumEngine:
         self._load_state()
 
     def _load_state(self):
+        # Try env var first (survives cold restarts via HF Secret)
+        env_state = os.environ.get('CURRICULUM_STATE_JSON', '')
+        if env_state:
+            try:
+                s = json.loads(env_state)
+                self.current_level = s.get('level', 1)
+                self.recent_scores = s.get('recent_scores', [])
+                self.total_episodes = s.get('total_episodes', 0)
+                self.retry_count = s.get('retry_count', 0)
+                print(f'Curriculum loaded from env var: level={self.current_level}', flush=True)
+                return
+            except Exception:
+                pass
+
+        # Fallback to file
         if STATE_FILE.exists():
             try:
                 with open(STATE_FILE) as f:
                     s = json.load(f)
+                    self.current_level = s.get('level', 1)
+                    self.recent_scores = s.get('recent_scores', [])
+                    self.total_episodes = s.get('total_episodes', 0)
+                    self.retry_count = s.get('retry_count', 0)
+                    return
+            except Exception:
+                pass
 
-                self.current_level = s.get("level", 1)
-                self.recent_scores = s.get("recent_scores", [])
-                self.total_episodes = s.get("total_episodes", 0)
-                self.retry_count = s.get("retry_count", 0)
-
-            except (json.JSONDecodeError, OSError):
-                self.current_level = 1
-                self.recent_scores = []
-                self.total_episodes = 0
-                self.retry_count = 0
-        else:
-            self.current_level = 1
-            self.recent_scores = []
-            self.total_episodes = 0
-            self.retry_count = 0
+        # Default
+        self.current_level = 1
+        self.recent_scores = []
+        self.total_episodes = 0
+        self.retry_count = 0
 
     def _save_state(self):
+        data = {
+            'level': self.current_level,
+            'recent_scores': self.recent_scores[-10:],
+            'total_episodes': self.total_episodes,
+            'retry_count': getattr(self, 'retry_count', 0),
+        }
+
         try:
-            with open(STATE_FILE, "w") as f:
-                json.dump(
-                    {
-                        "level": self.current_level,
-                        "recent_scores": self.recent_scores[-10:],
-                        "total_episodes": self.total_episodes,
-                        "retry_count": getattr(self, 'retry_count', 0),
-                    },
-                    f,
-                )
+            with open(STATE_FILE, 'w') as f:
+                json.dump(data, f)
         except OSError:
             pass
+
+        # Also expose via /state so frontend can see it
+        # (State already returned in state() method — no change needed there)
 
     def record_episode(self, score: float):
         self.recent_scores.append(round(score, 4))

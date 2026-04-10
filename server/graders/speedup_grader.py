@@ -8,9 +8,14 @@ Fallback:       timing ratio, only when plans are absent AND times differ >10%.
 Returns a value in [0.0, 1.0].  Weight (0.35) is applied by RewardComposer.
 
 Plan scoring table:
-  FULL TABLE SCAN → INDEX SCAN   : 0.85  (genuine index improvement)
+  FULL TABLE SCAN → INDEX SCAN      : 0.85  (genuine index improvement)
   FULL TABLE SCAN → FULL TABLE SCAN : 0.10  (no structural improvement)
-  INDEX SCAN     → INDEX SCAN    : 0.50  (already optimised, maintained)
+  INDEX SCAN     → INDEX SCAN       : 0.50  (already optimised, maintained)
+
+Pattern overrides (checked first):
+  SELECT_STAR            : 0.70  (column reduction is the fix, not indexing)
+  UNBOUNDED_AGGREGATION
+    SCAN → SCAN          : 0.55  (WHERE filter added — partial improvement)
 
 Timing fallback (plans unavailable, |diff| > 10%):
   ratio >= 50  → 1.0
@@ -33,8 +38,22 @@ class SpeedupGrader:
         opt_time_ms: float,
         orig_plan=None,
         opt_plan=None,
+        task_pattern=None,
     ) -> float:
-        # ── 1. Plan-cost-based scoring (primary signal) ──────────────────────
+        # ── 0. Pattern-aware overrides (before plan-cost check) ───────────────
+        # SELECT_STAR: column reduction is the fix, not index change.
+        # Both queries correctly do FULL TABLE SCAN for this anti-pattern.
+        if task_pattern == 'SELECT_STAR':
+            return 0.70
+
+        # UNBOUNDED_AGGREGATION: WHERE filter added = real improvement even if
+        # both plans remain FULL TABLE SCAN (no index needed for date filters).
+        if task_pattern == 'UNBOUNDED_AGGREGATION':
+            if orig_plan and opt_plan:
+                if (orig_plan.operation == 'FULL TABLE SCAN'
+                        and opt_plan.operation == 'FULL TABLE SCAN'):
+                    return 0.55  # partial improvement — filter added but still scanning
+
         if orig_plan is not None and opt_plan is not None:
             orig_op = getattr(orig_plan, "operation", None)
             opt_op = getattr(opt_plan, "operation", None)

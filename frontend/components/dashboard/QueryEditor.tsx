@@ -38,13 +38,43 @@ export function QueryEditor({ initialQuery, onSubmit, isLoading }: QueryEditorPr
   const [explanation, setExplanation] = useState('')
   const [indexes, setIndexes] = useState('')
   const [editorModules, setEditorModules] = useState<EditorModules | null>(null)
+  const [sqlError, setSqlError] = useState<string | null>(null)
+  const [isValidating, setIsValidating] = useState(false)
 
   useEffect(() => {
     setQuery(initialQuery)
     setPattern('NONE')
     setExplanation('')
     setIndexes('')
+    setSqlError(null)
   }, [initialQuery])
+
+  useEffect(() => {
+    if (!query.trim()) return
+
+    const timer = setTimeout(async () => {
+      setIsValidating(true)
+
+      try {
+        const res = await fetch('/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query }),
+        })
+
+        const data = await res.json()
+        setSqlError(data.valid ? null : data.error)
+
+      } catch {
+        setSqlError(null) // silent fail
+
+      } finally {
+        setIsValidating(false)
+      }
+    }, 800)
+
+    return () => clearTimeout(timer)
+  }, [query])
 
   useEffect(() => {
     let cancelled = false
@@ -105,29 +135,43 @@ export function QueryEditor({ initialQuery, onSubmit, isLoading }: QueryEditorPr
         Optimized Query Editor
       </div>
 
-      {editorModules ? (
-        <editorModules.CodeMirror
-          value={query}
-          height="200px"
-          extensions={editorExtensions}
-          theme={editorModules.oneDark}
-          onChange={setQuery}
-        />
-      ) : (
-        <div className="p-4" style={{ background: '#0B1020' }}>
-          <div className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-            Loading editor… You can already edit in the lightweight fallback below.
-          </div>
-          <textarea
+      <div
+        style={{
+          border: sqlError ? '1px solid #FF5252' : '1px solid var(--border-subtle)',
+          borderRadius: 8,
+          overflow: 'hidden',
+        }}
+      >
+        {editorModules ? (
+          <editorModules.CodeMirror
             value={query}
-            onChange={e => setQuery(e.target.value)}
-            className="w-full rounded-lg p-3 text-sm outline-none resize-y min-h-[200px]"
-            style={{
-              background: '#0F1229',
-              border: '1px solid #1E2140',
-              color: '#E8EAF6',
-            }}
+            height="200px"
+            extensions={editorExtensions}
+            theme={editorModules.oneDark}
+            onChange={setQuery}
           />
+        ) : (
+          <div className="p-4" style={{ background: '#0B1020' }}>
+            <div className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+              Loading editor… You can already edit in the lightweight fallback below.
+            </div>
+            <textarea
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              className="w-full rounded-lg p-3 text-sm outline-none resize-y min-h-[200px]"
+              style={{
+                background: '#0F1229',
+                border: '1px solid #1E2140',
+                color: '#E8EAF6',
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {sqlError && (
+        <div className="mt-2 text-xs" style={{ color: '#FF5252' }}>
+          SQL Error: {sqlError}
         </div>
       )}
 
@@ -196,15 +240,15 @@ export function QueryEditor({ initialQuery, onSubmit, isLoading }: QueryEditorPr
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => void handleSubmit()}
-          disabled={isLoading}
+          disabled={isLoading || sqlError !== null}
           className="w-full py-3 rounded-lg text-sm font-bold transition-all"
           style={{
-            background: isLoading ? '#1E2140' : 'linear-gradient(135deg, #4A90D9, #00D4FF)',
-            color: isLoading ? 'var(--text-muted)' : '#fff',
-            cursor: isLoading ? 'not-allowed' : 'pointer',
+            background: isLoading || sqlError !== null ? '#1E2140' : 'linear-gradient(135deg, #4A90D9, #00D4FF)',
+            color: isLoading || sqlError !== null ? 'var(--text-muted)' : '#fff',
+            cursor: isLoading || sqlError !== null ? 'not-allowed' : 'pointer',
           }}
         >
-          {isLoading ? '💡 Submitting...' : '⚡ Submit Optimization'}
+          {isLoading ? '💡 Submitting...' : isValidating ? '🔍 Validating...' : '⚡ Submit Optimization'}
         </motion.button>
       </div>
     </div>

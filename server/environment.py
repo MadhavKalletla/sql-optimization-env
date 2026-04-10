@@ -184,10 +184,10 @@ class SQLOptEnvironment:
             db_path=self._db_path,
         )
 
-        # Episode ends on max_steps OR excellent reward — NOT on syntax error
+        # Episode ends on max_steps OR score >= 0.75 (frontend pass threshold is 0.70)
         done = (
             self._state.current_step >= self._state.max_steps
-            or reward_detail.total >= 0.95
+            or reward_detail.total >= 0.75
         )
 
         self._state.episode_rewards.append(reward_detail.total)
