@@ -106,9 +106,11 @@ class SQLOptEnvironment:
                     f"(current={current_level}). Falling back.",
                     flush=True,
                 )
-                task = self.task_registry.get_task_for_level(current_level)
+                exclude_id = self._current_task.task_id if self._current_task else None
+                task = self.task_registry.get_task_for_level(current_level, exclude_task_id=exclude_id)
         else:
-            task = self.task_registry.get_task_for_level(current_level)
+            exclude_id = self._current_task.task_id if self._current_task else None
+            task = self.task_registry.get_task_for_level(current_level, exclude_task_id=exclude_id)
 
         self._current_task = task
         level = self.curriculum.current_level

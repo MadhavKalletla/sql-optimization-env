@@ -31,8 +31,12 @@ LEVEL_TASKS = {
 
 class TaskRegistry:
 
-    def get_task_for_level(self, level: int, seed: int = None):
-        tasks = LEVEL_TASKS.get(level, LEVEL_TASKS[1])
+    def get_task_for_level(self, level: int, seed: int = None, exclude_task_id: str = None):
+        all_tasks_for_level = LEVEL_TASKS.get(level, LEVEL_TASKS[1])
+        tasks = all_tasks_for_level
+
+        if exclude_task_id and len(all_tasks_for_level) > 1:
+            tasks = [t for t in all_tasks_for_level if t.task_id != exclude_task_id]
 
         # ✅ FIX: deterministic randomness (no global seed pollution)
         if seed is not None:
