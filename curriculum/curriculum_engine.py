@@ -85,15 +85,17 @@ class CurriculumEngine:
         self._save_state()
 
     def _evaluate_transition(self):
-        # Graduation: 3 consecutive >= 0.70
+        # Dynamic threshold — level 3 is harder, lower bar slightly
+        grad_threshold = 0.65 if self.current_level == 3 else self.GRADUATE_THRESHOLD
+
         if len(self.recent_scores) >= self.GRADUATE_CONSECUTIVE:
             last_n = self.recent_scores[-self.GRADUATE_CONSECUTIVE:]
-            if all(s >= self.GRADUATE_THRESHOLD for s in last_n):
+            if all(s >= grad_threshold for s in last_n):
                 if self.current_level < self.MAX_LEVEL:
                     self.current_level += 1
                     self.recent_scores = []
                     self.retry_count = 0
-                    print(f"CURRICULUM: Graduated to Level {self.current_level}")
+                    print(f'CURRICULUM: Graduated to Level {self.current_level}', flush=True)
                 return
 
         # Remediation: 2 consecutive < 0.40
@@ -102,14 +104,12 @@ class CurriculumEngine:
             if all(s < self.REMEDIATE_THRESHOLD for s in last_n_fail):
                 retry_count = getattr(self, 'retry_count', 0)
                 if retry_count < 1:
-                    # One retry at same level first (like a student getting a second chance)
                     self.retry_count = retry_count + 1
                     self.recent_scores = []
-                    print(f"CURRICULUM: Retrying Level {self.current_level} (attempt {self.retry_count + 1})")
+                    print(f'CURRICULUM: Retrying Level {self.current_level}', flush=True)
                 else:
-                    # Second failure — drop to lower level
                     if self.current_level > self.MIN_LEVEL:
                         self.current_level -= 1
                         self.recent_scores = []
                         self.retry_count = 0
-                        print(f"CURRICULUM: Stepped down to Level {self.current_level}")
+                        print(f'CURRICULUM: Dropped to Level {self.current_level}', flush=True)

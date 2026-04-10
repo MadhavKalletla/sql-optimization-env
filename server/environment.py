@@ -243,6 +243,7 @@ class SQLOptEnvironment:
     # ─────────────────────────────────────────
     def state(self) -> EnvironmentState:
         if self._state:
+            self._state.recent_scores = self.curriculum.recent_scores[-10:]
             return self._state
 
         return EnvironmentState(
@@ -254,6 +255,7 @@ class SQLOptEnvironment:
             episode_rewards=[],
             total_episodes=self.curriculum.total_episodes,
             is_running=False,
+            recent_scores=self.curriculum.recent_scores[-10:],
         )
 
     # ─────────────────────────────────────────

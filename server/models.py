@@ -100,3 +100,4 @@ class EnvironmentState(BaseModel):
     episode_rewards: List[float] = Field(default_factory=list)
     total_episodes: int = Field(ge=0)
     is_running: bool
+    recent_scores: List[float] = Field(default_factory=list)

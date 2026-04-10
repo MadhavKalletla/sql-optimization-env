@@ -1,6 +1,6 @@
 'use client'
 export const dynamic = 'force-static'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEnvironment } from '@/hooks/useEnvironment'
 import { useCurriculum } from '@/hooks/useCurriculum'
@@ -12,6 +12,7 @@ import { CurriculumNode } from '@/components/ui/curriculum-node'
 import { AntiPatternType, LEVEL_LABELS } from '@/lib/types'
 import { EpisodeHistory } from '@/components/dashboard/EpisodeHistory'
 import { LevelUpToast } from '@/components/dashboard/LevelUpToast'
+import { EpisodeResultModal } from '@/components/dashboard/EpisodeResultModal'
 import { RobotWidget } from '@/components/ui/RobotWidget'
 
 // curriculum_level here means the MINIMUM level required to access this task
@@ -71,6 +72,7 @@ export default function DashboardPage() {
   const [prevLevel, setPrevLevel] = useState<number | null>(null)
   const [showLevelUp, setShowLevelUp] = useState(false)
   const [lockedWarning, setLockedWarning] = useState<string | null>(null)
+  const [showResultModal, setShowResultModal] = useState(false)
   const didInitializeRef = useRef(false)
   const [hintLevel, setHintLevel] = useState(0)
   const hintTimerRef = useRef<NodeJS.Timeout[]>([])
@@ -135,24 +137,37 @@ export default function DashboardPage() {
   const lastScore = stepResult?.reward ?? 0
   const episodePassed = isEpisodeDone && lastScore >= 0.70
 
-  const autoAdvanceRef = useRef<number | null>(null)
-
+  // Open the result modal when episode ends (800ms delay lets RewardRadar animate first)
   useEffect(() => {
-    if (episodePassed) {
-      autoAdvanceRef.current = window.setTimeout(() => {
-        void reset()
-      }, 3000)
+    if (isEpisodeDone) {
+      const t = setTimeout(() => setShowResultModal(true), 800)
+      return () => clearTimeout(t)
+    } else {
+      setShowResultModal(false)
     }
+  }, [isEpisodeDone])
 
-    return () => {
-      if (autoAdvanceRef.current) {
-        clearTimeout(autoAdvanceRef.current)
-      }
-    }
-  }, [episodePassed, reset])
+  const handleModalNext = useCallback(async () => {
+    setShowResultModal(false)
+    await reset()
+  }, [reset])
+
+  const handleModalRetry = useCallback(async () => {
+    setShowResultModal(false)
+    await reset(selectedTask)
+  }, [reset, selectedTask])
 
   return (
     <>
+      <EpisodeResultModal
+        isOpen={showResultModal}
+        passed={episodePassed}
+        score={stepResult?.reward ?? 0}
+        speedupRatio={stepResult?.reward_detail?.speedup_ratio ?? 0}
+        episodeNumber={envState?.total_episodes ?? 0}
+        onNextEpisode={handleModalNext}
+        onRetry={handleModalRetry}
+      />
       {showLevelUp && (
         <LevelUpToast
           fromLevel={prevLevel ?? 1}
@@ -237,6 +252,31 @@ export default function DashboardPage() {
               <span>Ep: <strong style={{ color: '#E8EAF6' }}>{envState?.total_episodes ?? 0}</strong></span>
               <span>Steps: <strong style={{ color: '#E8EAF6' }}>{history?.length ?? 0}</strong></span>
             </div>
+
+            <button
+              onClick={async () => {
+                await fetch('/reset', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ task_id: 'pds_select_star' }),
+                })
+                setSelectedTask('pds_select_star')
+                setShowResultModal(false)
+                await reset('pds_select_star')
+              }}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '8px',
+                border: '1px solid #FF525240',
+                background: '#FF525210',
+                color: '#FF5252',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              ↺ Reset All
+            </button>
           </div>
         </header>
 
@@ -257,6 +297,16 @@ export default function DashboardPage() {
           {[1, 2, 3, 4, 5].map(level => (
             <CurriculumNode key={level} level={level} active={currentLevel} />
           ))}
+
+          {/* Pass streak indicator */}
+          {envState?.recent_scores && envState.recent_scores.length > 0 && (
+            <div style={{
+              position: 'absolute', right: '2rem',
+              fontSize: '0.7rem', color: '#FFD740',
+            }}>
+              Pass streak: {envState.recent_scores.filter(s => s >= 0.70).length}/3 toward next level
+            </div>
+          )}
         </div>
 
         {/* ─── LOCKED TASK WARNING ─── */}
@@ -352,48 +402,6 @@ export default function DashboardPage() {
                 </div>
 
                 <AnimatePresence>
-                  {/* ─── PASS BANNER ─── */}
-                  {episodePassed && (
-                    <motion.div
-                      key="pass-banner"
-                      initial={{ opacity: 0, scale: 0.97 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0 }}
-                      style={{ background: '#14532d', border: '1px solid #22c55e', borderRadius: 8, padding: '12px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                    >
-                      <span style={{ color: '#86efac', fontWeight: 600 }}>
-                        ✅ Score: {(lastScore * 100).toFixed(0)}% — Excellent! Auto-advancing in 3 seconds...
-                      </span>
-                      <button
-                        onClick={() => void reset()}
-                        style={{ background: '#22c55e', color: '#000', border: 'none', borderRadius: 6, padding: '6px 16px', fontWeight: 700, cursor: 'pointer' }}
-                      >
-                        Next Episode →
-                      </button>
-                    </motion.div>
-                  )}
-
-                  {/* ─── RETRY BANNER ─── */}
-                  {isEpisodeDone && !episodePassed && (
-                    <motion.div
-                      key="retry-banner"
-                      initial={{ opacity: 0, scale: 0.97 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0 }}
-                      style={{ background: '#422006', border: '1px solid #f59e0b', borderRadius: 8, padding: '12px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                    >
-                      <span style={{ color: '#fcd34d', fontWeight: 600 }}>
-                        ⚠️ Score: {(lastScore * 100).toFixed(0)}% — Need ≥70% to advance. Keep optimizing!
-                      </span>
-                      <button
-                        onClick={() => void reset(selectedTask)}
-                        style={{ background: '#f59e0b', color: '#000', border: 'none', borderRadius: 6, padding: '6px 16px', fontWeight: 700, cursor: 'pointer' }}
-                      >
-                        Retry Task ↺
-                      </button>
-                    </motion.div>
-                  )}
-
                   <QueryEditor
                     key={observation.task_id}
                     initialQuery={observation.current_query}
