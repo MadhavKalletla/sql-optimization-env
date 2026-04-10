@@ -76,6 +76,7 @@ export default function DashboardPage() {
   const didInitializeRef = useRef(false)
   const [hintLevel, setHintLevel] = useState(0)
   const hintTimerRef = useRef<NodeJS.Timeout[]>([])
+  const [episodeKey, setEpisodeKey] = useState(0)
 
   const currentLevel = envState?.curriculum_level ?? 1
 
@@ -150,12 +151,21 @@ export default function DashboardPage() {
   const handleModalNext = useCallback(async () => {
     setShowResultModal(false)
     await reset()
+    setEpisodeKey(k => k + 1)
   }, [reset])
 
   const handleModalRetry = useCallback(async () => {
     setShowResultModal(false)
-    await reset(selectedTask)
-  }, [reset, selectedTask])
+    await reset(observation?.task_id || selectedTask)
+    setEpisodeKey(k => k + 1)
+  }, [reset, observation?.task_id, selectedTask])
+
+  // Sync the top dropdown if the backend auto-advances to a new random task
+  useEffect(() => {
+    if (observation?.task_id && observation.task_id !== selectedTask) {
+      setSelectedTask(observation.task_id)
+    }
+  }, [observation?.task_id, selectedTask])
 
   return (
     <>
@@ -403,7 +413,7 @@ export default function DashboardPage() {
 
                 <AnimatePresence>
                   <QueryEditor
-                    key={observation.task_id}
+                    key={`${observation.task_id}-${episodeKey}`}
                     initialQuery={observation.current_query}
                     onSubmit={handleSubmit}
                     isLoading={isLoading}
