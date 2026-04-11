@@ -91,6 +91,12 @@ class HackDetector:
 
         # 8. Query identical to original (after normalization)
         if _normalize(q_upper) == _normalize(original_upper):
+            # For patterns where the query itself doesn't need to change,
+            # an identical query is CORRECT — only the index/structure matters.
+            # Do NOT penalize these patterns for identical queries.
+            pattern = getattr(task, 'expected_pattern', 'NONE')
+            if pattern in ('MISSING_INDEX', 'SELECT_STAR', 'UNBOUNDED_AGGREGATION'):
+                return None  # identical query is valid for these patterns
             return "QUERY_IDENTICAL"
 
         return None

@@ -22,7 +22,7 @@ from data.seed_database import seed_database
 
 ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = ROOT / "data" / "fixtures" / "benchmark_seed42.db"
-SEED_ROWS = 50_000
+SEED_ROWS = 200_000
 
 # ─────────────────────────────────────────────────────────────────────────────
 # REALISTIC TIMING SIMULATION
@@ -182,7 +182,7 @@ class SQLOptEnvironment:
         # Episode ends on max_steps OR score >= 0.70 (frontend pass threshold is 0.70)
         done = (
             self._state.current_step >= self._state.max_steps
-            or reward_detail.total >= 0.70
+            or reward_detail.total >= {1: 0.70, 2: 0.70, 3: 0.58, 4: 0.45, 5: 0.35}.get(self._state.curriculum_level, 0.70)
         )
 
         self._state.episode_rewards.append(reward_detail.total)

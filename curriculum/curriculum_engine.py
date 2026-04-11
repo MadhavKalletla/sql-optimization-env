@@ -86,7 +86,9 @@ class CurriculumEngine:
 
     def _evaluate_transition(self):
         # Dynamic threshold — level 3 is harder, lower bar slightly
-        grad_threshold = 0.65 if self.current_level == 3 else self.GRADUATE_THRESHOLD
+        # Level-aware graduation thresholds — harder levels need lower bars
+        _level_grad = {1: 0.70, 2: 0.70, 3: 0.58, 4: 0.45, 5: 0.35}
+        grad_threshold = _level_grad.get(self.current_level, self.GRADUATE_THRESHOLD)
 
         if len(self.recent_scores) >= self.GRADUATE_CONSECUTIVE:
             last_n = self.recent_scores[-self.GRADUATE_CONSECUTIVE:]

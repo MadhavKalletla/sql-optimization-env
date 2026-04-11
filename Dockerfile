@@ -21,7 +21,7 @@ RUN mkdir -p /tmp && chmod 777 /tmp
 RUN python - <<EOF
 from data.seed_database import seed_database
 try:
-    seed_database("data/fixtures/benchmark_seed42.db", 50000)
+    seed_database("data/fixtures/benchmark_seed42.db", 200000)
 except Exception as e:
     print("Seeding skipped:", e)
 EOF
