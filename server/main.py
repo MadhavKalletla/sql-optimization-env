@@ -1,10 +1,11 @@
 # server/main.py
 """
 FastAPI application — OpenEnv-compliant endpoints.
-GET /health, GET/POST /reset, POST /step, GET /state
+GET /health, GET /reset, POST /reset, POST /step, GET /state
 """
 
 import sqlite3
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
@@ -26,7 +27,7 @@ SCHEMA_DIR = ROOT / "data" / "schemas"
 
 
 # ─────────────────────────────────────────────────────────────
-# DOMAIN SPECS (UNCHANGED)
+# DOMAIN SPECS
 # ─────────────────────────────────────────────────────────────
 DOMAIN_SPECS: list[dict[str, Any]] = [
     {
@@ -91,7 +92,6 @@ def _table_row_counts() -> dict[str, int]:
     db = _fixture_db_path()
     if not db.is_file():
         return {}
-
     out: dict[str, int] = {}
     conn = sqlite3.connect(str(db))
     try:
@@ -137,19 +137,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount /_next/static so Next.js chunks are served correctly
+# Mount Next.js static assets
 _next_dir = ROOT / "static" / "_next"
 if _next_dir.exists():
     app.mount("/_next", StaticFiles(directory=str(_next_dir)), name="nextjs-assets")
 
 
 # ─────────────────────────────────────────────────────────────
-# UI + HEALTH
+# UI ROUTES
 # ─────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def home():
     f = ROOT / "static" / "index.html"
     return HTMLResponse(content=f.read_text(encoding="utf-8") if f.exists() else "<h1>Not found</h1>")
+
 
 @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/dashboard/", response_class=HTMLResponse, include_in_schema=False)
@@ -157,12 +158,16 @@ async def dashboard_page():
     f = ROOT / "static" / "dashboard" / "index.html"
     return HTMLResponse(content=f.read_text(encoding="utf-8") if f.exists() else "<h1>Not found</h1>")
 
+
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     f = ROOT / "static" / "favicon.ico"
     return FileResponse(str(f)) if f.exists() else HTMLResponse("", status_code=404)
 
 
+# ─────────────────────────────────────────────────────────────
+# HEALTH + PING (keep-alive)
+# ─────────────────────────────────────────────────────────────
 @app.get("/health")
 async def health():
     row_counts = _table_row_counts()
@@ -176,6 +181,15 @@ async def health():
     }
 
 
+@app.get("/ping")
+async def ping():
+    """Keep-alive endpoint — called every 30s by frontend to prevent HF cold start."""
+    return {"status": "alive", "ts": time.time()}
+
+
+# ─────────────────────────────────────────────────────────────
+# DOMAINS
+# ─────────────────────────────────────────────────────────────
 @app.get("/domains")
 async def domains():
     row_counts = _table_row_counts()
@@ -201,22 +215,36 @@ async def domains():
 
 
 # ─────────────────────────────────────────────────────────────
-# OPENENV ENDPOINTS (FIXED)
+# OPENENV CORE ENDPOINTS
 # ─────────────────────────────────────────────────────────────
 
 class ResetRequest(BaseModel):
     task_id: Optional[str] = None
 
-@app.api_route("/reset", methods=["GET", "POST"])
-async def reset(
-    task_id_query: Optional[str] = Query(default=None, alias="task_id"),
-    body: Optional[ResetRequest] = Body(default=None),
-) -> SQLOptObservation:
+
+# ── GET /reset — browser friendly, no body ───────────────────
+@app.get("/reset", response_model=SQLOptObservation)
+async def reset_get(task_id: Optional[str] = Query(default=None)):
+    """Reset the environment. Pass task_id as query param: /reset?task_id=gst_missing_index"""
     if env is None:
         raise HTTPException(status_code=500, detail="Environment not initialized")
+    try:
+        return env.reset(task_id=task_id)
+    except Exception as e:
+        print(f"[RESET ERROR] {e}", flush=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
+
+# ── POST /reset — validator + inference.py friendly ──────────
+@app.post("/reset", response_model=SQLOptObservation)
+async def reset_post(
+    task_id_query: Optional[str] = Query(default=None, alias="task_id"),
+    body: Optional[ResetRequest] = Body(default=None),
+):
+    """Reset the environment. task_id can be in query param OR JSON body."""
+    if env is None:
+        raise HTTPException(status_code=500, detail="Environment not initialized")
     resolved = (body.task_id if body else None) or task_id_query
-
     try:
         return env.reset(task_id=resolved)
     except Exception as e:
@@ -224,8 +252,9 @@ async def reset(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/step")
-async def step(action: SQLOptAction) -> StepResult:
+# ── POST /step ────────────────────────────────────────────────
+@app.post("/step", response_model=StepResult)
+async def step(action: SQLOptAction):
     if env is None:
         raise HTTPException(status_code=500, detail="Environment not initialized")
     try:
@@ -235,30 +264,9 @@ async def step(action: SQLOptAction) -> StepResult:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/validate")
-async def validate_sql(body: dict = Body(...)):
-    query = body.get("query", "").strip()
-
-    if not query:
-        return {"valid": False, "error": "Empty query"}
-
-    if env is None:
-        return {"valid": False, "error": "Environment not initialized"}
-
-    try:
-        db_path = env._db_path
-        conn = sqlite3.connect(str(db_path))
-        conn.execute(f"EXPLAIN {query}")
-        conn.close()
-
-        return {"valid": True, "error": None}
-
-    except sqlite3.Error as e:
-        return {"valid": False, "error": str(e)}
-
-
-@app.get("/state")
-async def state() -> EnvironmentState:
+# ── GET /state ────────────────────────────────────────────────
+@app.get("/state", response_model=EnvironmentState)
+async def state():
     if env is None:
         raise HTTPException(status_code=500, detail="Environment not initialized")
     try:
@@ -268,6 +276,7 @@ async def state() -> EnvironmentState:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ── GET /tasks ────────────────────────────────────────────────
 @app.get("/tasks")
 async def list_tasks():
     if env is None:
@@ -289,15 +298,33 @@ async def list_tasks():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ─────────────────────────────────────────────────────────────
+# UTILITY ENDPOINTS
+# ─────────────────────────────────────────────────────────────
+
+@app.post("/validate")
+async def validate_sql(body: dict = Body(...)):
+    """Validate SQL syntax without executing."""
+    query = body.get("query", "").strip()
+    if not query:
+        return {"valid": False, "error": "Empty query"}
+    if env is None:
+        return {"valid": False, "error": "Environment not initialized"}
+    try:
+        conn = sqlite3.connect(str(env._db_path))
+        conn.execute(f"EXPLAIN {query}")
+        conn.close()
+        return {"valid": True, "error": None}
+    except sqlite3.Error as e:
+        return {"valid": False, "error": str(e)}
+
+
 @app.get("/curriculum/export")
 async def export_curriculum():
     import json
-
     if env is None:
         return {"state": "{}"}
-
     c = env.curriculum
-
     return {
         "state": json.dumps({
             "level": c.current_level,
@@ -310,45 +337,31 @@ async def export_curriculum():
 @app.post("/grade")
 async def grade_task(body: dict = Body(...)):
     """
-    Grade a task submission.
-    Returns a score strictly between 0 and 1 (exclusive).
-    
-    Expected body:
-    {
-        "task_id": "gst_missing_index",
-        "action": {
-            "optimized_query": "SELECT ...",
-            "identified_pattern": "MISSING_INDEX",
-            "explanation": "...",
-            "index_statements": ["CREATE INDEX ..."],
-            "schema_analysis": "..."
-        }
-    }
+    Grade a task submission directly.
+    Returns score strictly between 0.002 and 0.998 (never exactly 0 or 1).
+
+    Body: { "task_id": "gst_missing_index", "action": { ...SQLOptAction fields... } }
     """
     if env is None:
         raise HTTPException(status_code=500, detail="Environment not initialized")
-    
+
     task_id = body.get("task_id")
     action_data = body.get("action")
-    
+
     if not task_id or not action_data:
         raise HTTPException(status_code=400, detail="Missing task_id or action")
-    
+
     try:
-        # Get the task
         task = env.task_registry.get_task_by_id(task_id)
         if task is None:
             raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
-        
-        # Parse action
+
         action = SQLOptAction(**action_data)
-        
-        # Run the original query to get baseline metrics
+
         orig_time, orig_rows, orig_plan = env._run_query(task.slow_query)
         task.original_time_ms = orig_time
         task.original_plan = orig_plan
-        
-        # Run the optimized query
+
         query_error = None
         try:
             opt_time, opt_rows, opt_plan = env._run_query(
@@ -359,8 +372,7 @@ async def grade_task(body: dict = Body(...)):
             opt_rows = 0
             opt_plan = None
             query_error = str(e)
-        
-        # Compute reward using the reward composer
+
         reward_detail = env.reward_composer.compute(
             task=task,
             action=action,
@@ -373,11 +385,10 @@ async def grade_task(body: dict = Body(...)):
             query_error=query_error,
             db_path=env._db_path,
         )
-        
-        # Return score strictly between 0 and 1 (exclusive)
-        # Use 0.002/0.998 bounds to avoid floating point edge cases
+
+        # Strictly between 0 and 1
         score = round(max(0.002, min(0.998, float(reward_detail.total))), 4)
-        
+
         return {
             "score": score,
             "task_id": task_id,
@@ -390,9 +401,9 @@ async def grade_task(body: dict = Body(...)):
                 "penalties": reward_detail.penalties,
                 "speedup_ratio": reward_detail.speedup_ratio,
                 "hack_detected": reward_detail.hack_detected,
-            }
+            },
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

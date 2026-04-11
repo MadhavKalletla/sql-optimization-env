@@ -15,6 +15,7 @@ import { LevelUpToast } from '@/components/dashboard/LevelUpToast'
 import { EpisodeResultModal } from '@/components/dashboard/EpisodeResultModal'
 import { ResetConfirmModal } from '@/components/dashboard/ResetConfirmModal'
 import { RobotWidget } from '@/components/ui/RobotWidget'
+import { AICoach } from '@/components/dashboard/AICoach'
 
 // curriculum_level here means the MINIMUM level required to access this task
 const TASK_OPTIONS = [
@@ -149,6 +150,21 @@ export default function DashboardPage() {
       setShowResultModal(false)
     }
   }, [isEpisodeDone])
+
+  const handleNextChallenge = useCallback(async () => {
+    // Find next available task based on current level
+    const currentTaskIndex = TASK_OPTIONS.findIndex(t => t.id === selectedTask)
+    const availableTasks = TASK_OPTIONS.filter(t => t.minLevel <= currentLevel)
+    
+    let nextTask = availableTasks[0] // Default to first available
+    if (currentTaskIndex >= 0 && currentTaskIndex < availableTasks.length - 1) {
+      nextTask = availableTasks[currentTaskIndex + 1]
+    }
+    
+    setSelectedTask(nextTask.id)
+    await reset(nextTask.id)
+    setEpisodeKey(k => k + 1)
+  }, [selectedTask, currentLevel, reset])
 
   const handleModalNext = useCallback(async () => {
     setShowResultModal(false)
@@ -447,6 +463,14 @@ export default function DashboardPage() {
           {/* RIGHT: Metrics */}
           <div className="space-y-4">
             <RewardRadar reward={stepResult?.reward_detail ?? null} previous={previousReward} />
+
+            {/* AI Coach - appears after step submission */}
+            {stepResult && (
+              <AICoach 
+                stepResult={stepResult} 
+                onNextChallenge={handleNextChallenge}
+              />
+            )}
 
             {observation ? (
               <ExplainTree
