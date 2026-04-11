@@ -148,8 +148,8 @@ def run_task(client: OpenAI, task_id: str) -> float:
         obs = resp.json()
     except Exception as e:
         print(f"[ERROR] Reset failed for {task_id}: {e}", flush=True)
-        log_end(success=False, steps=0, score=0.001, rewards=[0.001])
-        return 0.001
+        log_end(success=False, steps=0, score=0.002, rewards=[0.002])
+        return 0.002
 
     done = False
 
@@ -176,7 +176,7 @@ def run_task(client: OpenAI, task_id: str) -> float:
         done   = bool(result.get("done",   False))
         obs    = result.get("observation", obs)
 
-        reward = round(max(0.001, min(0.999, reward)), 4)
+        reward = round(max(0.002, min(0.998, reward)), 4)
         rewards.append(reward)
         steps_taken = step
 
@@ -190,8 +190,8 @@ def run_task(client: OpenAI, task_id: str) -> float:
         if done:
             break
 
-    score   = sum(rewards) / len(rewards) if rewards else 0.001
-    score = round(max(0.001, min(0.999, score)), 4)
+    score   = sum(rewards) / len(rewards) if rewards else 0.002
+    score = round(max(0.002, min(0.998, score)), 4)
     success = score >= SUCCESS_THRESHOLD
 
     log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
@@ -224,8 +224,9 @@ def main():
         print(f"[DEBUG] Task {task_id} score: {score:.4f}", flush=True)
 
     # Final safety clamp — ensure EVERY task score is strictly in (0, 1)
-    all_scores = {k: round(max(0.001, min(0.999, float(v))), 4) for k, v in all_scores.items()}
-    avg = round(max(0.001, min(0.999, sum(all_scores.values()) / len(all_scores))), 4) if all_scores else 0.001
+    # Use 0.002/0.998 (not 0.001/0.999) — Python's round(0.999, N) can equal 1.0!
+    all_scores = {k: round(max(0.002, min(0.998, float(v))), 4) for k, v in all_scores.items()}
+    avg = round(max(0.002, min(0.998, sum(all_scores.values()) / len(all_scores))), 4) if all_scores else 0.002
 
     print(json.dumps({
         "event":   "BENCHMARK_COMPLETE",

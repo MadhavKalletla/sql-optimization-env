@@ -18,7 +18,8 @@ from .graders.index_grader import IndexGrader
 
 
 def strict_score(score: float) -> float:
-    return round(max(0.001, min(0.999, float(score))), 4)
+    """Clamp to strictly open (0,1) — uses 0.002/0.998 to survive any rounding."""
+    return round(max(0.002, min(0.998, float(score))), 4)
 
 
 class RewardComposer:
@@ -59,19 +60,19 @@ class RewardComposer:
         db_path: Path = None,
     ) -> SQLOptReward:
 
-        penalty = 0.0
+        penalty = -0.0001  # tiny baseline prevents exactly 0.0 penalties field
 
         # ❗ Handle query failure immediately
         if query_error:
             return SQLOptReward(
-                total=0.001,
-                speedup_score=0.001,
-                equivalence_score=0.001,
-                pattern_score=0.001,
-                index_score=0.001,
-                simplicity_score=0.001,
+                total=0.002,
+                speedup_score=0.002,
+                equivalence_score=0.002,
+                pattern_score=0.002,
+                index_score=0.002,
+                simplicity_score=0.002,
                 penalties=self.PENALTIES["syntax_error"],
-                speedup_ratio=0.001,
+                speedup_ratio=0.002,
                 hack_detected=bool(hack),
                 hack_type=hack,
             )
@@ -115,7 +116,8 @@ class RewardComposer:
         if display_orig <= 0:
             speedup_ratio = 0.001
         else:
-            speedup_ratio = round(display_orig / max(display_opt, 0.001), 2)
+            # Use 4dp rounding to avoid round(0.999, 2) = 1.0 Python edge case
+            speedup_ratio = round(display_orig / max(display_opt, 0.001), 4)
 
         if speedup_ratio < 1.0 and speedup_raw == 0.05:
             penalty += self.PENALTIES["slower_query"]
@@ -124,8 +126,8 @@ class RewardComposer:
         # If the query is fundamentally incorrect, any "speedup" is just because 
         # it returned fewer rows or did less work. Don't reward or display it!
         if equiv_raw < 0.8:
-            speedup_raw = 0.001
-            speedup_ratio = 1.0
+            speedup_raw = 0.002
+            speedup_ratio = 0.5  # neutral — query wrong so speedup meaningless
 
 
         # ── 3. Anti-pattern Score ────────────────────────────────────────
@@ -159,17 +161,17 @@ class RewardComposer:
             + penalty
         )
 
-        total = round(max(0.001, min(0.999, raw_total)), 4)
+        total = round(max(0.002, min(0.998, raw_total)), 4)
 
         return SQLOptReward(
             total=total,
-            speedup_score=round(max(0.001, min(0.999, self.WEIGHTS["speedup"] * speedup_raw)), 4),
-            equivalence_score=round(max(0.001, min(0.999, self.WEIGHTS["equivalence"] * equiv_raw)), 4),
-            pattern_score=round(max(0.001, min(0.999, self.WEIGHTS["pattern"] * pattern_raw)), 4),
-            index_score=round(max(0.001, min(0.999, self.WEIGHTS["index"] * index_raw)), 4),
-            simplicity_score=round(max(0.001, min(0.999, self.WEIGHTS["simplicity"] * simplicity_raw)), 4),
-            penalties=round(penalty, 4),
-            speedup_ratio=round(max(0.001, speedup_ratio), 2),
+            speedup_score=round(max(0.002, min(0.998, self.WEIGHTS["speedup"] * speedup_raw)), 4),
+            equivalence_score=round(max(0.002, min(0.998, self.WEIGHTS["equivalence"] * equiv_raw)), 4),
+            pattern_score=round(max(0.002, min(0.998, self.WEIGHTS["pattern"] * pattern_raw)), 4),
+            index_score=round(max(0.002, min(0.998, self.WEIGHTS["index"] * index_raw)), 4),
+            simplicity_score=round(max(0.002, min(0.998, self.WEIGHTS["simplicity"] * simplicity_raw)), 4),
+            penalties=round(min(-0.0001, penalty), 4),
+            speedup_ratio=round(max(0.002, min(0.995, speedup_ratio)), 4),
             hack_detected=bool(hack),
             hack_type=hack,
         )

@@ -226,7 +226,8 @@ class SQLOptEnvironment:
         )
 
         # Final safety clamp — guarantee reward is strictly in (0, 1) at API level
-        final_reward = round(max(0.001, min(0.999, float(reward_detail.total))), 4)
+        # Use 0.002/0.998 bounds (not 0.001/0.999) — round(0.999,N) can equal 1.0 in Python!
+        final_reward = round(max(0.002, min(0.998, float(reward_detail.total))), 4)
 
         return StepResult(
             observation=next_obs,

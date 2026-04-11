@@ -37,7 +37,7 @@ class AntiPatternGrader:
         fix_score = self._grade_fix_quality(task, action)
         score += fix_score * 0.30
 
-        return min(0.999, score)
+        return max(0.001, min(0.999, score))
 
     def _is_partial_match(self, identified: str, expected: str) -> bool:
         related = {
@@ -68,7 +68,7 @@ class AntiPatternGrader:
 
         words = explanation.lower()
         hits = sum(1 for kw in keywords.get(expected_pattern, []) if kw in words)
-        return min(0.999, hits / 3)
+        return max(0.001, min(0.999, hits / 3))
 
     def _grade_fix_quality(self, task, action: SQLOptAction) -> float:
         """Check that the optimized query actually addresses the anti-pattern."""
