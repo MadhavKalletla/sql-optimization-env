@@ -148,7 +148,7 @@ def run_task(client: OpenAI, task_id: str) -> float:
         obs = resp.json()
     except Exception as e:
         print(f"[ERROR] Reset failed for {task_id}: {e}", flush=True)
-        log_end(success=False, steps=0, score=0.0, rewards=[])
+        log_end(success=False, steps=0, score=0.001, rewards=[0.001])
         return 0.001
 
     done = False
@@ -168,14 +168,15 @@ def run_task(client: OpenAI, task_id: str) -> float:
             step_resp.raise_for_status()
             result = step_resp.json()
         except Exception as e:
-            log_step(step, "", 0.0, True, error=str(e))
+            log_step(step, "", 0.001, True, error=str(e))
             steps_taken = step
             break
 
-        reward = float(result.get("reward", 0.0))
+        reward = float(result.get("reward", 0.001))
         done   = bool(result.get("done",   False))
         obs    = result.get("observation", obs)
 
+        reward = round(max(0.001, min(0.999, reward)), 4)
         rewards.append(reward)
         steps_taken = step
 

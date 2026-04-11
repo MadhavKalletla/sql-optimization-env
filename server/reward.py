@@ -64,7 +64,7 @@ class RewardComposer:
         # ❗ Handle query failure immediately
         if query_error:
             return SQLOptReward(
-                total=0.0,
+                total=0.001,
                 speedup_score=0.0,
                 equivalence_score=0.0,
                 pattern_score=0.0,
@@ -124,7 +124,7 @@ class RewardComposer:
         # If the query is fundamentally incorrect, any "speedup" is just because 
         # it returned fewer rows or did less work. Don't reward or display it!
         if equiv_raw < 0.8:
-            speedup_raw = 0.0
+            speedup_raw = 0.001
             speedup_ratio = 1.0
 
 

@@ -99,15 +99,8 @@ class SQLOptEnvironment:
             task = self.task_registry.get_task_by_id(task_id)
             if task is None:
                 raise ValueError(f"Task '{task_id}' not found")
-            # CURRICULUM GATE
-            if task.curriculum_level > current_level:
-                print(
-                    f"[CURRICULUM] Blocked jump to level {task.curriculum_level} "
-                    f"(current={current_level}). Falling back.",
-                    flush=True,
-                )
-                exclude_id = self._current_task.task_id if self._current_task else None
-                task = self.task_registry.get_task_for_level(current_level, exclude_task_id=exclude_id)
+            # Allow explicit task_id to bypass curriculum gate for evaluation
+            # (curriculum still applies for random task selection)
         else:
             exclude_id = self._current_task.task_id if self._current_task else None
             task = self.task_registry.get_task_for_level(current_level, exclude_task_id=exclude_id)
