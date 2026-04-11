@@ -149,7 +149,7 @@ def run_task(client: OpenAI, task_id: str) -> float:
     except Exception as e:
         print(f"[ERROR] Reset failed for {task_id}: {e}", flush=True)
         log_end(success=False, steps=0, score=0.0, rewards=[])
-        return 0.0
+        return 0.001
 
     done = False
 
@@ -190,7 +190,7 @@ def run_task(client: OpenAI, task_id: str) -> float:
             break
 
     score   = sum(rewards) / len(rewards) if rewards else 0.0
-    score   = max(0.0, min(1.0, score))
+    score = round(max(0.001, min(0.999, score)), 4)
     success = score >= SUCCESS_THRESHOLD
 
     log_end(success=success, steps=steps_taken, score=score, rewards=rewards)

@@ -12,7 +12,7 @@ class IndexGrader:
             # No indexes submitted — partial credit if pattern doesn't need one
             if task.expected_pattern in ("SELECT_STAR", "LEADING_WILDCARD"):
                 return 0.5
-            return 0.0
+            return 0.001
 
         score = 0.0
 
@@ -47,4 +47,4 @@ class IndexGrader:
             score += 0.10
         # >5 is handled by hack detector
 
-        return max(0.0, min(1.0, score))
+        return max(0.001, min(0.999, score))

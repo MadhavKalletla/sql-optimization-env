@@ -45,18 +45,18 @@ class EquivalenceGrader:
             try:
                 opt_rows = list(map(tuple, conn.execute(optimized_query).fetchall()))
             except Exception:
-                return 0.0   # Syntax / runtime error in optimized query
+                return 0.001   # Syntax / runtime error in optimized query
 
             n_base = len(baseline_rows)
             n_opt  = len(opt_rows)
 
             # Empty result edge cases
             if n_base == 0 and n_opt == 0:
-                return 1.0
+                return 0.999
             if n_base == 0:
                 return 0.3   # baseline empty but opt returns rows → suspicious
             if n_opt == 0:
-                return 0.0   # opt returns nothing → wrong
+                return 0.001   # opt returns nothing → wrong
 
             # ── Row count ratio (soft, not hard) ────────────────────────────
             # If counts are the same → ratio = 1.0
@@ -90,7 +90,7 @@ class EquivalenceGrader:
             # 20% row count ratio     (soft penalty for very different cardinality)
             score = (jaccard * 0.50) + (exact_overlap * 0.30) + (count_ratio * 0.20)
 
-            return round(max(0.0, min(1.0, score)), 4)
+            return round(max(0.001, min(0.999, score)), 4)
 
         finally:
             conn.close()

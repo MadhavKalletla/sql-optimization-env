@@ -17,6 +17,10 @@ from .graders.antipattern_grader import AntiPatternGrader
 from .graders.index_grader import IndexGrader
 
 
+def strict_score(score: float) -> float:
+    return round(max(0.001, min(0.999, float(score))), 4)
+
+
 class RewardComposer:
 
     WEIGHTS = {
@@ -155,7 +159,7 @@ class RewardComposer:
             + penalty
         )
 
-        total = round(max(0.0, min(1.0, raw_total)), 4)
+        total = round(max(0.001, min(0.999, raw_total)), 4)
 
         return SQLOptReward(
             total=total,
@@ -182,7 +186,7 @@ class RewardComposer:
 
         # ✅ FIX: allow small margin instead of strict ≤
         if opt_len <= orig_len * 1.1:
-            return 1.0
+            return 0.999
 
         ratio = orig_len / max(opt_len, 1)
-        return max(0.0, ratio)
+        return max(0.001, ratio)
