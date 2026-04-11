@@ -225,9 +225,12 @@ class SQLOptEnvironment:
             error_message=query_error,
         )
 
+        # Final safety clamp — guarantee reward is strictly in (0, 1) at API level
+        final_reward = round(max(0.001, min(0.999, float(reward_detail.total))), 4)
+
         return StepResult(
             observation=next_obs,
-            reward=reward_detail.total,
+            reward=final_reward,
             reward_detail=reward_detail,
             done=done,
             info={"hack": hack, "query_error": query_error},

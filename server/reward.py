@@ -65,13 +65,13 @@ class RewardComposer:
         if query_error:
             return SQLOptReward(
                 total=0.001,
-                speedup_score=0.0,
-                equivalence_score=0.0,
-                pattern_score=0.0,
-                index_score=0.0,
-                simplicity_score=0.0,
+                speedup_score=0.001,
+                equivalence_score=0.001,
+                pattern_score=0.001,
+                index_score=0.001,
+                simplicity_score=0.001,
                 penalties=self.PENALTIES["syntax_error"],
-                speedup_ratio=0.0,
+                speedup_ratio=0.001,
                 hack_detected=bool(hack),
                 hack_type=hack,
             )
@@ -113,7 +113,7 @@ class RewardComposer:
             display_opt = opt_time * fast_f
 
         if display_orig <= 0:
-            speedup_ratio = 0.0
+            speedup_ratio = 0.001
         else:
             speedup_ratio = round(display_orig / max(display_opt, 0.001), 2)
 
@@ -163,13 +163,13 @@ class RewardComposer:
 
         return SQLOptReward(
             total=total,
-            speedup_score=round(self.WEIGHTS["speedup"] * speedup_raw, 4),
-            equivalence_score=round(self.WEIGHTS["equivalence"] * equiv_raw, 4),
-            pattern_score=round(self.WEIGHTS["pattern"] * pattern_raw, 4),
-            index_score=round(self.WEIGHTS["index"] * index_raw, 4),
-            simplicity_score=round(self.WEIGHTS["simplicity"] * simplicity_raw, 4),
+            speedup_score=round(max(0.001, min(0.999, self.WEIGHTS["speedup"] * speedup_raw)), 4),
+            equivalence_score=round(max(0.001, min(0.999, self.WEIGHTS["equivalence"] * equiv_raw)), 4),
+            pattern_score=round(max(0.001, min(0.999, self.WEIGHTS["pattern"] * pattern_raw)), 4),
+            index_score=round(max(0.001, min(0.999, self.WEIGHTS["index"] * index_raw)), 4),
+            simplicity_score=round(max(0.001, min(0.999, self.WEIGHTS["simplicity"] * simplicity_raw)), 4),
             penalties=round(penalty, 4),
-            speedup_ratio=round(speedup_ratio, 2),
+            speedup_ratio=round(max(0.001, speedup_ratio), 2),
             hack_detected=bool(hack),
             hack_type=hack,
         )

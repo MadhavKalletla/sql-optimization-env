@@ -135,7 +135,7 @@ def run_task(client: OpenAI, task_id: str) -> float:
 
     rewards     = []
     steps_taken = 0
-    score       = 0.0
+    score       = 0.001
     success     = False
 
     try:
@@ -190,7 +190,7 @@ def run_task(client: OpenAI, task_id: str) -> float:
         if done:
             break
 
-    score   = sum(rewards) / len(rewards) if rewards else 0.0
+    score   = sum(rewards) / len(rewards) if rewards else 0.001
     score = round(max(0.001, min(0.999, score)), 4)
     success = score >= SUCCESS_THRESHOLD
 
@@ -223,7 +223,9 @@ def main():
         all_scores[task_id] = score
         print(f"[DEBUG] Task {task_id} score: {score:.4f}", flush=True)
 
-    avg = sum(all_scores.values()) / len(all_scores) if all_scores else 0.0
+    # Final safety clamp — ensure EVERY task score is strictly in (0, 1)
+    all_scores = {k: round(max(0.001, min(0.999, float(v))), 4) for k, v in all_scores.items()}
+    avg = round(max(0.001, min(0.999, sum(all_scores.values()) / len(all_scores))), 4) if all_scores else 0.001
 
     print(json.dumps({
         "event":   "BENCHMARK_COMPLETE",
