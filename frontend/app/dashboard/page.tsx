@@ -13,6 +13,7 @@ import { AntiPatternType, LEVEL_LABELS } from '@/lib/types'
 import { EpisodeHistory } from '@/components/dashboard/EpisodeHistory'
 import { LevelUpToast } from '@/components/dashboard/LevelUpToast'
 import { EpisodeResultModal } from '@/components/dashboard/EpisodeResultModal'
+import { ResetConfirmModal } from '@/components/dashboard/ResetConfirmModal'
 import { RobotWidget } from '@/components/ui/RobotWidget'
 
 // curriculum_level here means the MINIMUM level required to access this task
@@ -73,6 +74,7 @@ export default function DashboardPage() {
   const [showLevelUp, setShowLevelUp] = useState(false)
   const [lockedWarning, setLockedWarning] = useState<string | null>(null)
   const [showResultModal, setShowResultModal] = useState(false)
+  const [showResetModal, setShowResetModal] = useState(false)
   const didInitializeRef = useRef(false)
   const [hintLevel, setHintLevel] = useState(0)
   const hintTimerRef = useRef<NodeJS.Timeout[]>([])
@@ -160,6 +162,18 @@ export default function DashboardPage() {
     setEpisodeKey(k => k + 1)
   }, [reset, observation?.task_id, selectedTask])
 
+  const handleConfirmReset = async () => {
+    setShowResetModal(false)
+    await fetch('/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_id: 'pds_select_star' }),
+    })
+    setSelectedTask('pds_select_star')
+    setShowResultModal(false)
+    await reset('pds_select_star')
+  }
+
   // Sync the top dropdown if the backend auto-advances to a new random task
   useEffect(() => {
     if (observation?.task_id && observation.task_id !== selectedTask) {
@@ -177,6 +191,11 @@ export default function DashboardPage() {
         episodeNumber={envState?.total_episodes ?? 0}
         onNextEpisode={handleModalNext}
         onRetry={handleModalRetry}
+      />
+      <ResetConfirmModal 
+        isOpen={showResetModal}
+        onConfirm={handleConfirmReset}
+        onCancel={() => setShowResetModal(false)}
       />
       {showLevelUp && (
         <LevelUpToast
@@ -264,16 +283,7 @@ export default function DashboardPage() {
             </div>
 
             <button
-              onClick={async () => {
-                await fetch('/reset', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ task_id: 'pds_select_star' }),
-                })
-                setSelectedTask('pds_select_star')
-                setShowResultModal(false)
-                await reset('pds_select_star')
-              }}
+              onClick={() => setShowResetModal(true)}
               style={{
                 padding: '6px 14px',
                 borderRadius: '8px',
