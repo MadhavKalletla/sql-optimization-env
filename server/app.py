@@ -2,6 +2,8 @@
 
 from server.main import app
 
+__all__ = ["app"]
+
 
 def main():
     import uvicorn

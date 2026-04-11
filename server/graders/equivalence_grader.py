@@ -21,6 +21,11 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 _DEFAULT_DB = _ROOT / "data" / "fixtures" / "benchmark_seed42.db"
 
 
+def _clamp(v: float) -> float:
+    """Clamp to strictly (0.01, 0.99) range."""
+    return round(max(0.01, min(0.99, v)), 4)
+
+
 class EquivalenceGrader:
 
     def grade(self, task, optimized_query: str, db_path: Path = None) -> float:
@@ -45,18 +50,18 @@ class EquivalenceGrader:
             try:
                 opt_rows = list(map(tuple, conn.execute(optimized_query).fetchall()))
             except Exception:
-                return 0.001   # Syntax / runtime error in optimized query
+                return 0.01   # Syntax / runtime error in optimized query
 
             n_base = len(baseline_rows)
             n_opt  = len(opt_rows)
 
             # Empty result edge cases
             if n_base == 0 and n_opt == 0:
-                return 0.999
+                return 0.99
             if n_base == 0:
                 return 0.3   # baseline empty but opt returns rows → suspicious
             if n_opt == 0:
-                return 0.001   # opt returns nothing → wrong
+                return 0.01   # opt returns nothing → wrong
 
             # ── Row count ratio (soft, not hard) ────────────────────────────
             # If counts are the same → ratio = 1.0
@@ -71,13 +76,13 @@ class EquivalenceGrader:
             opt_keys  = set(r[0] for r in opt_rows)      if opt_rows and opt_rows[0] else set()
 
             if not base_keys and not opt_keys:
-                jaccard = 0.999
+                jaccard = 0.99
             elif not base_keys or not opt_keys:
-                jaccard = 0.001
+                jaccard = 0.01
             else:
                 intersection = len(base_keys & opt_keys)
                 union        = len(base_keys | opt_keys)
-                jaccard = intersection / union if union > 0 else 0.999
+                jaccard = intersection / union if union > 0 else 0.99
 
             # ── Full row set comparison (bonus for exact match) ──────────────
             base_set = set(baseline_rows)
@@ -90,7 +95,7 @@ class EquivalenceGrader:
             # 20% row count ratio     (soft penalty for very different cardinality)
             score = (jaccard * 0.50) + (exact_overlap * 0.30) + (count_ratio * 0.20)
 
-            return round(max(0.001, min(0.999, score)), 4)
+            return _clamp(score)
 
         finally:
             conn.close()

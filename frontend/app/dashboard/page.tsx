@@ -451,9 +451,9 @@ export default function DashboardPage() {
             {observation ? (
               <ExplainTree
                 plan={stepResult?.observation.execution_plan ?? observation.execution_plan}
-                originalPlan={originalPlan ?? undefined}
+                originalPlan={stepResult ? (originalPlan ?? undefined) : undefined}
                 timingMs={stepResult?.observation.execution_time_ms ?? observation.execution_time_ms}
-                originalTimingMs={observation.execution_time_ms}
+                originalTimingMs={stepResult ? observation.execution_time_ms : undefined}
               />
             ) : (
               <DashboardLoader label="Execution plan appears after backend responds." />

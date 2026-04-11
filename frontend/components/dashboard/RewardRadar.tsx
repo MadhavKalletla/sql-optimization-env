@@ -34,7 +34,7 @@ export function RewardRadar({ reward, previous }: RewardRadarProps) {
   }))
 
   const totalScoreRounded = reward ? Math.round(reward.total * 100) : 0
-  const displayScore = reward ? reward.total.toFixed(3) : "0.000"
+  const displayScore = reward ? reward.total.toFixed(3) : "-"
 
   const scoreColor =
     totalScoreRounded >= 70 ? '#00E676'

@@ -65,7 +65,7 @@ class RewardComposer:
         # ── Query error — return minimum safe scores immediately ──────────
         if query_error:
             return SQLOptReward(
-                total=0.011,
+                total=0.02,
                 speedup_score=0.011,
                 equivalence_score=0.011,
                 pattern_score=0.011,
@@ -162,7 +162,7 @@ class RewardComposer:
             - penalty_val
         )
 
-        total = _safe(raw_total)
+        total = round(max(0.01, min(0.99, raw_total)), 4)
 
         return SQLOptReward(
             total=total,
@@ -184,7 +184,7 @@ class RewardComposer:
         opt_len  = len(" ".join(optimized.split()))
 
         if opt_len <= orig_len * 1.1:
-            return 0.995   # capped below 0.998 intentionally
+            return 0.95   # capped below 0.99 intentionally
 
         ratio = orig_len / max(opt_len, 1)
-        return max(0.011, min(0.989, ratio))
+        return max(0.02, min(0.989, ratio))

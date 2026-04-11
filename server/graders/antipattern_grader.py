@@ -7,10 +7,15 @@ Returns value in [0.0, 1.0].  Weight (0.20) applied by RewardComposer.
 from ..models import AntiPatternType, SQLOptAction
 
 
+def _clamp(v: float) -> float:
+    """Clamp to strictly (0.01, 0.99) range."""
+    return round(max(0.01, min(0.99, v)), 4)
+
+
 class AntiPatternGrader:
 
     def grade(self, task, action: SQLOptAction) -> float:
-        score = 0.001
+        score = 0.01
 
         expected = task.expected_pattern
 
@@ -37,7 +42,7 @@ class AntiPatternGrader:
         fix_score = self._grade_fix_quality(task, action)
         score += fix_score * 0.30
 
-        return max(0.001, min(0.999, score))
+        return _clamp(score)
 
     def _is_partial_match(self, identified: str, expected: str) -> bool:
         related = {
@@ -50,7 +55,7 @@ class AntiPatternGrader:
 
     def _grade_explanation(self, explanation: str, expected_pattern: str) -> float:
         if not explanation:
-            return 0.001
+            return 0.01
 
         # "Manual" means the user chose not to explain — partial credit only.
         if explanation.strip().lower() == "manual":
@@ -68,7 +73,7 @@ class AntiPatternGrader:
 
         words = explanation.lower()
         hits = sum(1 for kw in keywords.get(expected_pattern, []) if kw in words)
-        return max(0.001, min(0.999, hits / 3))
+        return max(0.01, min(0.99, hits / 3))
 
     def _grade_fix_quality(self, task, action: SQLOptAction) -> float:
         """Check that the optimized query actually addresses the anti-pattern."""
@@ -76,18 +81,18 @@ class AntiPatternGrader:
         pattern = task.expected_pattern
 
         if pattern == "SELECT_STAR" and "SELECT *" not in opt:
-            return 0.999
+            return 0.99
         if pattern == "N_PLUS_ONE" and "JOIN" in opt:
-            return 0.999
+            return 0.99
         if pattern == "CARTESIAN_PRODUCT" and " ON " in opt:
-            return 0.999
+            return 0.99
         if pattern == "MISSING_INDEX" and action.index_statements:
-            return 0.999
+            return 0.99
         if pattern == "LEADING_WILDCARD" and "LIKE '%" not in opt:
             return 0.8
         if pattern == "IMPLICIT_CAST" and "CAST" not in opt:
-            return 0.999
+            return 0.99
         if pattern == "UNBOUNDED_AGGREGATION" and ("WHERE" in opt or "BETWEEN" in opt):
-            return 0.999
+            return 0.99
 
         return 0.2  # Partial credit

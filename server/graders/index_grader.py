@@ -5,6 +5,11 @@ Returns value in [0.0, 1.0].  Weight (0.10) applied by RewardComposer.
 """
 
 
+def _clamp(v: float) -> float:
+    """Clamp to strictly (0.01, 0.99) range."""
+    return round(max(0.01, min(0.99, v)), 4)
+
+
 class IndexGrader:
 
     def grade(self, task, action, opt_plan) -> float:
@@ -12,9 +17,9 @@ class IndexGrader:
             # No indexes submitted — partial credit if pattern doesn't need one
             if task.expected_pattern in ("SELECT_STAR", "LEADING_WILDCARD"):
                 return 0.5
-            return 0.001
+            return 0.01
 
-        score = 0.001
+        score = 0.01
 
         # Check 1: Was an index actually used in the plan?  (60 %)
         if opt_plan and opt_plan.using_index:
@@ -47,4 +52,4 @@ class IndexGrader:
             score += 0.10
         # >5 is handled by hack detector
 
-        return max(0.001, min(0.999, score))
+        return _clamp(score)

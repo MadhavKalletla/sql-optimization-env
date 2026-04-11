@@ -76,10 +76,10 @@ class SpeedupGrader:
         # Only use timing when there is a meaningful difference (> 10 %).
         ratio = orig_time_ms / max(opt_time_ms, 0.001)
 
-        if ratio >= 50:   return 0.999
+        if ratio >= 50:   return 0.99
         if ratio >= 20:   return 0.85
         if ratio >= 10:   return 0.70
         if ratio >= 5:    return 0.50
         if ratio >= 2:    return 0.30
         if ratio >= 1.1:  return 0.15
-        return 0.05  # never return 0.0 for timing alone
+        return 0.05  # never return 0.01 for timing alone
