@@ -5,9 +5,6 @@ from typing import Optional, List, Dict, Any
 from enum import Enum
 
 
-# ─────────────────────────────────────────────────────────────
-# Anti-pattern Enum
-# ─────────────────────────────────────────────────────────────
 class AntiPatternType(str, Enum):
     N_PLUS_ONE = 'N_PLUS_ONE'
     CARTESIAN_PRODUCT = 'CARTESIAN_PRODUCT'
@@ -19,9 +16,6 @@ class AntiPatternType(str, Enum):
     NONE = 'NONE'
 
 
-# ─────────────────────────────────────────────────────────────
-# Execution Plan
-# ─────────────────────────────────────────────────────────────
 class ExecutionPlan(BaseModel):
     operation: str
     rows_examined: int = Field(ge=0)
@@ -29,12 +23,9 @@ class ExecutionPlan(BaseModel):
     cost_estimate: float = Field(ge=0.0)
     using_index: Optional[str] = None
     missing_index_hint: Optional[str] = None
-    explain_raw: str
+    explain_raw: str = ""
 
 
-# ─────────────────────────────────────────────────────────────
-# Observation Model
-# ─────────────────────────────────────────────────────────────
 class SQLOptObservation(BaseModel):
     task_id: str
     step_number: int = Field(ge=0)
@@ -50,9 +41,6 @@ class SQLOptObservation(BaseModel):
     error_message: Optional[str] = None
 
 
-# ─────────────────────────────────────────────────────────────
-# Action Model
-# ─────────────────────────────────────────────────────────────
 class SQLOptAction(BaseModel):
     optimized_query: str = Field(min_length=1)
     identified_pattern: AntiPatternType = AntiPatternType.NONE
@@ -61,36 +49,27 @@ class SQLOptAction(BaseModel):
     schema_analysis: str = ''
 
 
-# ─────────────────────────────────────────────────────────────
-# Reward Model
-# ─────────────────────────────────────────────────────────────
 class SQLOptReward(BaseModel):
-    total: float = Field(gt=0.0, lt=1.0)
-    speedup_score: float = Field(gt=0.0)
-    equivalence_score: float = Field(gt=0.0)
-    pattern_score: float = Field(gt=0.0)
-    index_score: float = Field(gt=0.0)
-    simplicity_score: float = Field(gt=0.0)
-    penalties: float = Field(gt=0.0)  # penalties displayed as positive magnitude
-    speedup_ratio: float = Field(gt=0.0)
-    hack_detected: bool
+    total: float                          # ✅ no gt/lt — clamped in code
+    speedup_score: float = 0.0           # ✅ ge not gt — can be 0
+    equivalence_score: float = 0.0
+    pattern_score: float = 0.0
+    index_score: float = 0.0
+    simplicity_score: float = 0.0
+    penalties: float = 0.0               # ✅ CAN BE NEGATIVE — was crashing with gt=0.0
+    speedup_ratio: float = 0.0
+    hack_detected: bool = False
     hack_type: Optional[str] = None
 
 
-# ─────────────────────────────────────────────────────────────
-# Step Result
-# ─────────────────────────────────────────────────────────────
 class StepResult(BaseModel):
     observation: SQLOptObservation
-    reward: float = Field(gt=0.0, lt=1.0)
+    reward: float                         # ✅ no gt/lt — clamped in environment.py
     reward_detail: SQLOptReward
     done: bool
     info: Dict[str, Any] = Field(default_factory=dict)
 
 
-# ─────────────────────────────────────────────────────────────
-# Environment State
-# ─────────────────────────────────────────────────────────────
 class EnvironmentState(BaseModel):
     episode_id: str
     current_task_id: str
