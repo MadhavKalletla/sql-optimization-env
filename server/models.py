@@ -65,14 +65,14 @@ class SQLOptAction(BaseModel):
 # Reward Model
 # ─────────────────────────────────────────────────────────────
 class SQLOptReward(BaseModel):
-    total: float = Field(ge=0.0, le=1.0)
-    speedup_score: float = Field(ge=0.0)
-    equivalence_score: float = Field(ge=0.0)
-    pattern_score: float = Field(ge=0.0)
-    index_score: float = Field(ge=0.0)
-    simplicity_score: float = Field(ge=0.0)
+    total: float = Field(gt=0.0, lt=1.0)
+    speedup_score: float = Field(gt=0.0)
+    equivalence_score: float = Field(gt=0.0)
+    pattern_score: float = Field(gt=0.0)
+    index_score: float = Field(gt=0.0)
+    simplicity_score: float = Field(gt=0.0)
     penalties: float = Field(le=0.0)  # penalties should be negative or zero
-    speedup_ratio: float = Field(ge=0.0)
+    speedup_ratio: float = Field(gt=0.0)
     hack_detected: bool
     hack_type: Optional[str] = None
 
@@ -82,7 +82,7 @@ class SQLOptReward(BaseModel):
 # ─────────────────────────────────────────────────────────────
 class StepResult(BaseModel):
     observation: SQLOptObservation
-    reward: float = Field(ge=0.0, le=1.0)
+    reward: float = Field(gt=0.0, lt=1.0)
     reward_detail: SQLOptReward
     done: bool
     info: Dict[str, Any] = Field(default_factory=dict)

@@ -10,7 +10,7 @@ from ..models import AntiPatternType, SQLOptAction
 class AntiPatternGrader:
 
     def grade(self, task, action: SQLOptAction) -> float:
-        score = 0.0
+        score = 0.001
 
         expected = task.expected_pattern
 

@@ -32,12 +32,12 @@ class ProgressTracker:
     def mean_reward(self, last_n: int = 0) -> float:
         data = self._history[-last_n:] if last_n else self._history
         if not data:
-            return 0.0
+            return 0.001
         return round(sum(e["reward"] for e in data) / len(data), 4)
 
     def best_reward(self, task_id: Optional[str] = None) -> float:
         data = [e for e in self._history if not task_id or e["task_id"] == task_id]
-        return max((e["reward"] for e in data), default=0.0)
+        return max((e["reward"] for e in data), default=0.001)
 
     def total_episodes(self) -> int:
         return len(self._history)

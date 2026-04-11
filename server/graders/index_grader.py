@@ -14,7 +14,7 @@ class IndexGrader:
                 return 0.5
             return 0.001
 
-        score = 0.0
+        score = 0.001
 
         # Check 1: Was an index actually used in the plan?  (60 %)
         if opt_plan and opt_plan.using_index:

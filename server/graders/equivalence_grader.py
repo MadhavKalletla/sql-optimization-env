@@ -71,13 +71,13 @@ class EquivalenceGrader:
             opt_keys  = set(r[0] for r in opt_rows)      if opt_rows and opt_rows[0] else set()
 
             if not base_keys and not opt_keys:
-                jaccard = 1.0
+                jaccard = 0.999
             elif not base_keys or not opt_keys:
-                jaccard = 0.0
+                jaccard = 0.001
             else:
                 intersection = len(base_keys & opt_keys)
                 union        = len(base_keys | opt_keys)
-                jaccard = intersection / union if union > 0 else 1.0
+                jaccard = intersection / union if union > 0 else 0.999
 
             # ── Full row set comparison (bonus for exact match) ──────────────
             base_set = set(baseline_rows)

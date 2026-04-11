@@ -40,6 +40,6 @@ actions:
 
 rewards:
   type: number
-  exclusiveMinimum: 0.0
-  exclusiveMaximum: 1.0
+  minimum: 0.001
+  maximum: 0.999
   description: 'Weighted reward: speedup(35%) + equivalence(25%) + pattern(20%) + index(10%) + simplicity(10%)'
