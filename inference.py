@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 inference.py — OpenEnv benchmark inference script.
-Fixes: openai version compat, HF_TOKEN as api_key, all 9 tasks supported.
+ALL scores strictly in (0.002, 0.998) — never exactly 0.0 or 1.0.
 """
 
 import json, os, sys, time
@@ -52,31 +52,36 @@ identified_pattern must be one of: N_PLUS_ONE, CARTESIAN_PRODUCT, MISSING_INDEX,
 SELECT_STAR, LEADING_WILDCARD, IMPLICIT_CAST, UNBOUNDED_AGGREGATION, NONE"""
 
 
+# ── Safe clamp — NEVER returns exactly 0.0 or 1.0 ───────────────────────────
+def _safe(v: float) -> float:
+    return round(max(0.002, min(0.998, float(v))), 4)
+
+
 # ── Logging ─────────────────────────────────────────────────────────────────
 
 def log_start(task: str, env: str, model: str):
     print("[START]", json.dumps({
-        "task": task,
-        "env": env,
-        "model": model,
+        "task":      task,
+        "env":       env,
+        "model":     model,
         "timestamp": time.time(),
     }), flush=True)
 
 def log_step(step: int, action: str, reward: float, done: bool, error=None):
     print("[STEP]", json.dumps({
-        "step": step,
+        "step":   step,
         "action": action[:200] if action else "",
-        "reward": round(reward, 4),
-        "done": done,
-        "error": str(error) if error else None,
+        "reward": _safe(reward),
+        "done":   done,
+        "error":  str(error) if error else None,
     }), flush=True)
 
 def log_end(success: bool, steps: int, score: float, rewards: List[float]):
     print("[END]", json.dumps({
         "success": success,
-        "steps": steps,
-        "score": round(score, 4),
-        "rewards": [round(r, 4) for r in rewards],
+        "steps":   steps,
+        "score":   _safe(score),
+        "rewards": [_safe(r) for r in rewards],
     }), flush=True)
 
 
@@ -135,9 +140,8 @@ def run_task(client: OpenAI, task_id: str) -> float:
 
     rewards     = []
     steps_taken = 0
-    score       = 0.001
-    success     = False
 
+    # ── Reset ────────────────────────────────────────────────────────────────
     try:
         resp = requests.get(
             f"{ENV_BASE_URL}/reset",
@@ -153,6 +157,7 @@ def run_task(client: OpenAI, task_id: str) -> float:
 
     done = False
 
+    # ── Steps ────────────────────────────────────────────────────────────────
     for step in range(1, MAX_STEPS + 1):
         if done:
             break
@@ -168,15 +173,15 @@ def run_task(client: OpenAI, task_id: str) -> float:
             step_resp.raise_for_status()
             result = step_resp.json()
         except Exception as e:
-            log_step(step, "", 0.001, True, error=str(e))
+            log_step(step, "", 0.002, True, error=str(e))
             steps_taken = step
             break
 
-        reward = float(result.get("reward", 0.001))
-        done   = bool(result.get("done",   False))
+        # Clamp reward from server BEFORE logging or appending
+        reward = _safe(float(result.get("reward", 0.002)))
+        done   = bool(result.get("done", False))
         obs    = result.get("observation", obs)
 
-        reward = round(max(0.002, min(0.998, reward)), 4)
         rewards.append(reward)
         steps_taken = step
 
@@ -190,8 +195,9 @@ def run_task(client: OpenAI, task_id: str) -> float:
         if done:
             break
 
+    # ── Score ─────────────────────────────────────────────────────────────────
     score   = sum(rewards) / len(rewards) if rewards else 0.002
-    score = round(max(0.002, min(0.998, score)), 4)
+    score   = _safe(score)
     success = score >= SUCCESS_THRESHOLD
 
     log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
@@ -223,15 +229,14 @@ def main():
         all_scores[task_id] = score
         print(f"[DEBUG] Task {task_id} score: {score:.4f}", flush=True)
 
-    # Final safety clamp — ensure EVERY task score is strictly in (0, 1)
-    # Use 0.002/0.998 (not 0.001/0.999) — Python's round(0.999, N) can equal 1.0!
-    all_scores = {k: round(max(0.002, min(0.998, float(v))), 4) for k, v in all_scores.items()}
-    avg = round(max(0.002, min(0.998, sum(all_scores.values()) / len(all_scores))), 4) if all_scores else 0.002
+    # Final safety clamp on every score before printing
+    all_scores = {k: _safe(v) for k, v in all_scores.items()}
+    avg = _safe(sum(all_scores.values()) / len(all_scores)) if all_scores else 0.002
 
     print(json.dumps({
         "event":   "BENCHMARK_COMPLETE",
-        "scores":  {k: round(v, 4) for k, v in all_scores.items()},
-        "average": round(avg, 4),
+        "scores":  {k: v for k, v in all_scores.items()},
+        "average": avg,
     }), flush=True)
 
 

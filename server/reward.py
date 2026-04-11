@@ -5,8 +5,7 @@ Reward Composer — computes the 5-dimension weighted reward per PDF spec.
     reward = 0.35 * speedup + 0.25 * equivalence + 0.20 * pattern
            + 0.10 * index   + 0.10 * simplicity   - penalties
 
-Each grader returns a score in [0.0, 1.0].  Weights are applied HERE,
-not inside the graders (FIX from original).
+ALL returned scores are strictly in (0.002, 0.998) — never exactly 0.0 or 1.0.
 """
 
 from pathlib import Path
@@ -17,9 +16,14 @@ from .graders.antipattern_grader import AntiPatternGrader
 from .graders.index_grader import IndexGrader
 
 
-def strict_score(score: float) -> float:
-    """Clamp to strictly open (0,1) — uses 0.002/0.998 to survive any rounding."""
-    return round(max(0.002, min(0.998, float(score))), 4)
+def _safe(v: float) -> float:
+    """Clamp to strictly open (0, 1) using 0.002/0.998 bounds."""
+    return round(max(0.002, min(0.998, float(v))), 4)
+
+
+def _safe_neg(v: float) -> float:
+    """Clamp penalty field: always strictly negative, never 0.0."""
+    return round(min(-0.0002, float(v)), 4)
 
 
 class RewardComposer:
@@ -33,18 +37,18 @@ class RewardComposer:
     }
 
     PENALTIES = {
-        "syntax_error":        -0.30,
-        "wrong_results":       -0.20,
-        "slower_query":        -0.10,
-        "timeout_per_second":  -0.05,
-        "hack_detected":       -0.40,
+        "syntax_error":       -0.30,
+        "wrong_results":      -0.20,
+        "slower_query":       -0.10,
+        "timeout_per_second": -0.05,
+        "hack_detected":      -0.40,
     }
 
     def __init__(self):
-        self.speedup_grader = SpeedupGrader()
-        self.equiv_grader = EquivalenceGrader()
-        self.pattern_grader = AntiPatternGrader()
-        self.index_grader = IndexGrader()
+        self.speedup_grader  = SpeedupGrader()
+        self.equiv_grader    = EquivalenceGrader()
+        self.pattern_grader  = AntiPatternGrader()
+        self.index_grader    = IndexGrader()
 
     def compute(
         self,
@@ -60,9 +64,10 @@ class RewardComposer:
         db_path: Path = None,
     ) -> SQLOptReward:
 
-        penalty = -0.0001  # tiny baseline prevents exactly 0.0 penalties field
+        # Start penalty at -0.0002 so it is NEVER exactly 0.0
+        penalty = -0.0002
 
-        # ❗ Handle query failure immediately
+        # ── Query error — return minimum safe scores immediately ──────────
         if query_error:
             return SQLOptReward(
                 total=0.002,
@@ -71,83 +76,84 @@ class RewardComposer:
                 pattern_score=0.002,
                 index_score=0.002,
                 simplicity_score=0.002,
-                penalties=self.PENALTIES["syntax_error"],
+                penalties=_safe_neg(self.PENALTIES["syntax_error"]),
                 speedup_ratio=0.002,
                 hack_detected=bool(hack),
                 hack_type=hack,
             )
 
         # ── 1. Equivalence Score ─────────────────────────────────────────
-        equiv_raw = self.equiv_grader.grade(
+        equiv_raw = _safe(self.equiv_grader.grade(
             task, action.optimized_query, db_path=db_path
-        )
+        ))
 
         if equiv_raw < 0.5:
             penalty += self.PENALTIES["wrong_results"]
 
         # ── 2. Speedup Score ─────────────────────────────────────────────
-        speedup_raw = self.speedup_grader.grade(
+        speedup_raw = _safe(self.speedup_grader.grade(
             orig_time,
             opt_time,
             orig_plan=orig_plan,
             opt_plan=opt_plan,
             task_pattern=getattr(task, 'expected_pattern', None),
-        )
+        ))
 
-        # Compute display speedup ratio using pattern-scaled times for meaningful UI value
-        pattern = getattr(task, 'expected_pattern', 'NONE')
-        _SLOW = {"SELECT_STAR": 120, "N_PLUS_ONE": 200, "CARTESIAN_PRODUCT": 500,
-                 "MISSING_INDEX": 80, "LEADING_WILDCARD": 90, "IMPLICIT_CAST": 70,
-                 "UNBOUNDED_AGGREGATION": 60, "NONE": 50}
-        _FAST = {"SELECT_STAR": 8, "N_PLUS_ONE": 5, "CARTESIAN_PRODUCT": 6,
-                 "MISSING_INDEX": 3, "LEADING_WILDCARD": 6, "IMPLICIT_CAST": 4,
-                 "UNBOUNDED_AGGREGATION": 10, "NONE": 10}
+        # Display speedup ratio — pattern-aware scaling
+        pattern  = getattr(task, 'expected_pattern', 'NONE')
+        _SLOW = {
+            "SELECT_STAR": 120, "N_PLUS_ONE": 200, "CARTESIAN_PRODUCT": 500,
+            "MISSING_INDEX": 80, "LEADING_WILDCARD": 90, "IMPLICIT_CAST": 70,
+            "UNBOUNDED_AGGREGATION": 60, "NONE": 50,
+        }
+        _FAST = {
+            "SELECT_STAR": 8,  "N_PLUS_ONE": 5,   "CARTESIAN_PRODUCT": 6,
+            "MISSING_INDEX": 3, "LEADING_WILDCARD": 6, "IMPLICIT_CAST": 4,
+            "UNBOUNDED_AGGREGATION": 10, "NONE": 10,
+        }
         slow_f = _SLOW.get(pattern, 80.0)
         fast_f = _FAST.get(pattern, 8.0)
 
         if orig_plan and opt_plan:
-            orig_is_scan = opt_plan.operation != "FULL TABLE SCAN"
-            display_orig = orig_time * slow_f
-            display_opt = opt_time * (fast_f if orig_is_scan else slow_f * 0.85)
+            orig_is_scan  = opt_plan.operation != "FULL TABLE SCAN"
+            display_orig  = orig_time * slow_f
+            display_opt   = opt_time * (fast_f if orig_is_scan else slow_f * 0.85)
         else:
-            display_orig = orig_time * slow_f
-            display_opt = opt_time * fast_f
+            display_orig  = orig_time * slow_f
+            display_opt   = opt_time * fast_f
 
         if display_orig <= 0:
-            speedup_ratio = 0.001
+            speedup_ratio = 0.5   # neutral — cannot compute
         else:
-            # Use 4dp rounding to avoid round(0.999, 2) = 1.0 Python edge case
-            speedup_ratio = round(display_orig / max(display_opt, 0.001), 4)
+            raw_ratio     = display_orig / max(display_opt, 0.001)
+            speedup_ratio = round(max(0.002, min(0.995, raw_ratio)), 4)
 
-        if speedup_ratio < 1.0 and speedup_raw == 0.05:
+        if speedup_ratio < 1.0 and speedup_raw <= 0.06:
             penalty += self.PENALTIES["slower_query"]
 
-        # 🚨 NULLIFY SPEEDUP IF QUERY IS WRONG ────────────────────────────
-        # If the query is fundamentally incorrect, any "speedup" is just because 
-        # it returned fewer rows or did less work. Don't reward or display it!
+        # Nullify speedup if query is semantically wrong
         if equiv_raw < 0.8:
-            speedup_raw = 0.002
-            speedup_ratio = 0.5  # neutral — query wrong so speedup meaningless
-
+            speedup_raw   = 0.002
+            speedup_ratio = 0.5
 
         # ── 3. Anti-pattern Score ────────────────────────────────────────
-        pattern_raw = self.pattern_grader.grade(task, action)
+        pattern_raw = _safe(self.pattern_grader.grade(task, action))
 
         # ── 4. Index Score ───────────────────────────────────────────────
-        index_raw = self.index_grader.grade(task, action, opt_plan)
+        index_raw = _safe(self.index_grader.grade(task, action, opt_plan))
 
         # ── 5. Simplicity Score ──────────────────────────────────────────
-        simplicity_raw = self._simplicity_score(
+        simplicity_raw = _safe(self._simplicity_score(
             task.slow_query, action.optimized_query
-        )
+        ))
 
-        # ── ⏱ Timeout penalty (>5 s) ─────────────────────────────────────
+        # ── Timeout penalty (>5 s) ───────────────────────────────────────
         if opt_time > 5000:
             penalty += self.PENALTIES["timeout_per_second"] * (
                 (opt_time / 1000) - 5
             )
 
-        # ── 🚨 Hack detection ────────────────────────────────────────────
+        # ── Hack detection ───────────────────────────────────────────────
         if hack:
             penalty += self.PENALTIES["hack_detected"]
 
@@ -161,16 +167,16 @@ class RewardComposer:
             + penalty
         )
 
-        total = round(max(0.002, min(0.998, raw_total)), 4)
+        total = _safe(raw_total)
 
         return SQLOptReward(
             total=total,
-            speedup_score=round(max(0.002, min(0.998, self.WEIGHTS["speedup"] * speedup_raw)), 4),
-            equivalence_score=round(max(0.002, min(0.998, self.WEIGHTS["equivalence"] * equiv_raw)), 4),
-            pattern_score=round(max(0.002, min(0.998, self.WEIGHTS["pattern"] * pattern_raw)), 4),
-            index_score=round(max(0.002, min(0.998, self.WEIGHTS["index"] * index_raw)), 4),
-            simplicity_score=round(max(0.002, min(0.998, self.WEIGHTS["simplicity"] * simplicity_raw)), 4),
-            penalties=round(min(-0.0001, penalty), 4),
+            speedup_score=_safe(self.WEIGHTS["speedup"]     * speedup_raw),
+            equivalence_score=_safe(self.WEIGHTS["equivalence"] * equiv_raw),
+            pattern_score=_safe(self.WEIGHTS["pattern"]     * pattern_raw),
+            index_score=_safe(self.WEIGHTS["index"]       * index_raw),
+            simplicity_score=_safe(self.WEIGHTS["simplicity"]  * simplicity_raw),
+            penalties=_safe_neg(penalty),
             speedup_ratio=round(max(0.002, min(0.995, speedup_ratio)), 4),
             hack_detected=bool(hack),
             hack_type=hack,
@@ -178,17 +184,12 @@ class RewardComposer:
 
     @staticmethod
     def _simplicity_score(original: str, optimized: str) -> float:
-        """
-        Reward simpler queries (avoid whitespace tricks).
-        """
-
-        # ✅ FIX: normalize whitespace (prevents cheating)
+        """Reward simpler queries — normalize whitespace to prevent cheating."""
         orig_len = len(" ".join(original.split()))
-        opt_len = len(" ".join(optimized.split()))
+        opt_len  = len(" ".join(optimized.split()))
 
-        # ✅ FIX: allow small margin instead of strict ≤
         if opt_len <= orig_len * 1.1:
-            return 0.999
+            return 0.995   # capped below 0.998 intentionally
 
         ratio = orig_len / max(opt_len, 1)
-        return max(0.001, ratio)
+        return max(0.002, min(0.995, ratio))
