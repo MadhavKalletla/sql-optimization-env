@@ -33,11 +33,12 @@ export function RewardRadar({ reward, previous }: RewardRadarProps) {
     fullMark: 100,
   }))
 
-  const totalScore = reward ? Math.round(reward.total * 100) : 0
+  const totalScoreRounded = reward ? Math.round(reward.total * 100) : 0
+  const displayScore = reward ? reward.total.toFixed(3) : "0.000"
 
   const scoreColor =
-    totalScore >= 70 ? '#00E676'
-    : totalScore >= 40 ? '#FFD740'
+    totalScoreRounded >= 70 ? '#00E676'
+    : totalScoreRounded >= 40 ? '#FFD740'
     : '#FF5252'
 
   return (
@@ -62,14 +63,14 @@ export function RewardRadar({ reward, previous }: RewardRadarProps) {
 
           <AnimatePresence mode="wait">
             <motion.div
-              key={totalScore}
+              key={displayScore}
               initial={{ scale: 0.6, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.6, opacity: 0 }}
               className="text-2xl font-bold font-mono"
               style={{ color: scoreColor }}
             >
-              {totalScore}%
+              {displayScore}
             </motion.div>
           </AnimatePresence>
         </div>
