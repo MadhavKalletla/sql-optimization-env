@@ -305,3 +305,96 @@ async def export_curriculum():
             "total_episodes": c.total_episodes,
         })
     }
+
+
+@app.post("/grade")
+async def grade_task(body: dict = Body(...)):
+    """
+    Grade a task submission.
+    Returns a score strictly between 0 and 1 (exclusive).
+    
+    Expected body:
+    {
+        "task_id": "gst_missing_index",
+        "action": {
+            "optimized_query": "SELECT ...",
+            "identified_pattern": "MISSING_INDEX",
+            "explanation": "...",
+            "index_statements": ["CREATE INDEX ..."],
+            "schema_analysis": "..."
+        }
+    }
+    """
+    if env is None:
+        raise HTTPException(status_code=500, detail="Environment not initialized")
+    
+    task_id = body.get("task_id")
+    action_data = body.get("action")
+    
+    if not task_id or not action_data:
+        raise HTTPException(status_code=400, detail="Missing task_id or action")
+    
+    try:
+        # Get the task
+        task = env.task_registry.get_task_by_id(task_id)
+        if task is None:
+            raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
+        
+        # Parse action
+        action = SQLOptAction(**action_data)
+        
+        # Run the original query to get baseline metrics
+        orig_time, orig_rows, orig_plan = env._run_query(task.slow_query)
+        task.original_time_ms = orig_time
+        task.original_plan = orig_plan
+        
+        # Run the optimized query
+        query_error = None
+        try:
+            opt_time, opt_rows, opt_plan = env._run_query(
+                action.optimized_query, action.index_statements
+            )
+        except Exception as e:
+            opt_time = orig_time * 3.0
+            opt_rows = 0
+            opt_plan = None
+            query_error = str(e)
+        
+        # Compute reward using the reward composer
+        reward_detail = env.reward_composer.compute(
+            task=task,
+            action=action,
+            orig_time=orig_time,
+            opt_time=opt_time,
+            opt_rows=opt_rows,
+            orig_plan=orig_plan,
+            opt_plan=opt_plan,
+            hack=env.hack_detector.detect(action, task),
+            query_error=query_error,
+            db_path=env._db_path,
+        )
+        
+        # Return score strictly between 0 and 1 (exclusive)
+        # Use 0.002/0.998 bounds to avoid floating point edge cases
+        score = round(max(0.002, min(0.998, float(reward_detail.total))), 4)
+        
+        return {
+            "score": score,
+            "task_id": task_id,
+            "details": {
+                "speedup_score": reward_detail.speedup_score,
+                "equivalence_score": reward_detail.equivalence_score,
+                "pattern_score": reward_detail.pattern_score,
+                "index_score": reward_detail.index_score,
+                "simplicity_score": reward_detail.simplicity_score,
+                "penalties": reward_detail.penalties,
+                "speedup_ratio": reward_detail.speedup_ratio,
+                "hack_detected": reward_detail.hack_detected,
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[GRADE ERROR] {e}", flush=True)
+        raise HTTPException(status_code=500, detail=str(e))
