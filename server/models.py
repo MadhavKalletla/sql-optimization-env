@@ -71,7 +71,7 @@ class SQLOptReward(BaseModel):
     pattern_score: float = Field(gt=0.0)
     index_score: float = Field(gt=0.0)
     simplicity_score: float = Field(gt=0.0)
-    penalties: float = Field(le=0.0)  # penalties should be negative or zero
+    penalties: float = Field(gt=0.0)  # penalties displayed as positive magnitude
     speedup_ratio: float = Field(gt=0.0)
     hack_detected: bool
     hack_type: Optional[str] = None

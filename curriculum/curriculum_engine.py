@@ -26,6 +26,7 @@ class CurriculumEngine:
 
     def __init__(self):
         self._load_state()
+        self.current_level = 5  # Force unlock all tasks
 
     def _load_state(self):
         # Try env var first (survives cold restarts via HF Secret)
@@ -56,10 +57,13 @@ class CurriculumEngine:
                 pass
 
         # Default
-        self.current_level = 1
+        self.current_level = 5
         self.recent_scores = []
         self.total_episodes = 0
         self.retry_count = 0
+
+        # FORCE ALL UNLOCK for user testing
+        self.current_level = 5
 
     def _save_state(self):
         data = {

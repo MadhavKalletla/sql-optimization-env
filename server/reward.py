@@ -17,13 +17,8 @@ from .graders.index_grader import IndexGrader
 
 
 def _safe(v: float) -> float:
-    """Clamp to strictly open (0, 1) using 0.002/0.998 bounds."""
-    return round(max(0.002, min(0.998, float(v))), 4)
-
-
-def _safe_neg(v: float) -> float:
-    """Clamp penalty field: always strictly negative, never 0.0."""
-    return round(min(-0.0002, float(v)), 4)
+    """Clamp to strictly open (0, 1) using 0.011/0.989 bounds."""
+    return round(max(0.011, min(0.989, float(v))), 4)
 
 
 class RewardComposer:
@@ -37,11 +32,11 @@ class RewardComposer:
     }
 
     PENALTIES = {
-        "syntax_error":       -0.30,
-        "wrong_results":      -0.20,
-        "slower_query":       -0.10,
-        "timeout_per_second": -0.05,
-        "hack_detected":      -0.40,
+        "syntax_error":       0.30,
+        "wrong_results":      0.20,
+        "slower_query":       0.10,
+        "timeout_per_second": 0.05,
+        "hack_detected":      0.40,
     }
 
     def __init__(self):
@@ -64,20 +59,20 @@ class RewardComposer:
         db_path: Path = None,
     ) -> SQLOptReward:
 
-        # Start penalty at -0.0002 so it is NEVER exactly 0.0
-        penalty = -0.0002
+        # Start penalty at 0.011 so it is NEVER exactly 0.0 on output schema
+        penalty_val = 0.011
 
         # ── Query error — return minimum safe scores immediately ──────────
         if query_error:
             return SQLOptReward(
-                total=0.002,
-                speedup_score=0.002,
-                equivalence_score=0.002,
-                pattern_score=0.002,
-                index_score=0.002,
-                simplicity_score=0.002,
-                penalties=_safe_neg(self.PENALTIES["syntax_error"]),
-                speedup_ratio=0.002,
+                total=0.011,
+                speedup_score=0.011,
+                equivalence_score=0.011,
+                pattern_score=0.011,
+                index_score=0.011,
+                simplicity_score=0.011,
+                penalties=_safe(self.PENALTIES["syntax_error"]),
+                speedup_ratio=0.011,
                 hack_detected=bool(hack),
                 hack_type=hack,
             )
@@ -88,7 +83,7 @@ class RewardComposer:
         ))
 
         if equiv_raw < 0.5:
-            penalty += self.PENALTIES["wrong_results"]
+            penalty_val += self.PENALTIES["wrong_results"]
 
         # ── 2. Speedup Score ─────────────────────────────────────────────
         speedup_raw = _safe(self.speedup_grader.grade(
@@ -129,11 +124,11 @@ class RewardComposer:
             speedup_ratio = round(max(0.002, min(0.995, raw_ratio)), 4)
 
         if speedup_ratio < 1.0 and speedup_raw <= 0.06:
-            penalty += self.PENALTIES["slower_query"]
+            penalty_val += self.PENALTIES["slower_query"]
 
         # Nullify speedup if query is semantically wrong
         if equiv_raw < 0.8:
-            speedup_raw   = 0.002
+            speedup_raw   = 0.011
             speedup_ratio = 0.5
 
         # ── 3. Anti-pattern Score ────────────────────────────────────────
@@ -149,13 +144,13 @@ class RewardComposer:
 
         # ── Timeout penalty (>5 s) ───────────────────────────────────────
         if opt_time > 5000:
-            penalty += self.PENALTIES["timeout_per_second"] * (
+            penalty_val += self.PENALTIES["timeout_per_second"] * (
                 (opt_time / 1000) - 5
             )
 
         # ── Hack detection ───────────────────────────────────────────────
         if hack:
-            penalty += self.PENALTIES["hack_detected"]
+            penalty_val += self.PENALTIES["hack_detected"]
 
         # ── Weighted sum ─────────────────────────────────────────────────
         raw_total = (
@@ -164,7 +159,7 @@ class RewardComposer:
             + self.WEIGHTS["pattern"]     * pattern_raw
             + self.WEIGHTS["index"]       * index_raw
             + self.WEIGHTS["simplicity"]  * simplicity_raw
-            + penalty
+            - penalty_val
         )
 
         total = _safe(raw_total)
@@ -176,8 +171,8 @@ class RewardComposer:
             pattern_score=_safe(self.WEIGHTS["pattern"]     * pattern_raw),
             index_score=_safe(self.WEIGHTS["index"]       * index_raw),
             simplicity_score=_safe(self.WEIGHTS["simplicity"]  * simplicity_raw),
-            penalties=_safe_neg(penalty),
-            speedup_ratio=round(max(0.002, min(0.995, speedup_ratio)), 4),
+            penalties=_safe(penalty_val),
+            speedup_ratio=round(max(0.011, min(0.989, speedup_ratio)), 4),
             hack_detected=bool(hack),
             hack_type=hack,
         )
@@ -192,4 +187,4 @@ class RewardComposer:
             return 0.995   # capped below 0.998 intentionally
 
         ratio = orig_len / max(opt_len, 1)
-        return max(0.002, min(0.995, ratio))
+        return max(0.011, min(0.989, ratio))

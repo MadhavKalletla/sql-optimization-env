@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 inference.py — OpenEnv benchmark inference script.
-ALL scores strictly in (0.002, 0.998) — never exactly 0.0 or 1.0.
+ALL scores strictly in (0.011, 0.989) — never exactly 0.0 or 1.0.
 """
 
 import json, os, sys, time
@@ -54,7 +54,7 @@ SELECT_STAR, LEADING_WILDCARD, IMPLICIT_CAST, UNBOUNDED_AGGREGATION, NONE"""
 
 # ── Safe clamp — NEVER returns exactly 0.0 or 1.0 ───────────────────────────
 def _safe(v: float) -> float:
-    return round(max(0.002, min(0.998, float(v))), 4)
+    return round(max(0.011, min(0.989, float(v))), 4)
 
 
 # ── Logging ─────────────────────────────────────────────────────────────────
@@ -152,8 +152,8 @@ def run_task(client: OpenAI, task_id: str) -> float:
         obs = resp.json()
     except Exception as e:
         print(f"[ERROR] Reset failed for {task_id}: {e}", flush=True)
-        log_end(success=False, steps=0, score=0.002, rewards=[0.002])
-        return 0.002
+        log_end(success=False, steps=0, score=0.011, rewards=[0.011])
+        return 0.011
 
     done = False
 
@@ -173,12 +173,12 @@ def run_task(client: OpenAI, task_id: str) -> float:
             step_resp.raise_for_status()
             result = step_resp.json()
         except Exception as e:
-            log_step(step, "", 0.002, True, error=str(e))
+            log_step(step, "", 0.011, True, error=str(e))
             steps_taken = step
             break
 
         # Clamp reward from server BEFORE logging or appending
-        reward = _safe(float(result.get("reward", 0.002)))
+        reward = _safe(float(result.get("reward", 0.011)))
         done   = bool(result.get("done", False))
         obs    = result.get("observation", obs)
 
@@ -196,7 +196,7 @@ def run_task(client: OpenAI, task_id: str) -> float:
             break
 
     # ── Score ─────────────────────────────────────────────────────────────────
-    score   = sum(rewards) / len(rewards) if rewards else 0.002
+    score   = sum(rewards) / len(rewards) if rewards else 0.011
     score   = _safe(score)
     success = score >= SUCCESS_THRESHOLD
 
@@ -231,7 +231,7 @@ def main():
 
     # Final safety clamp on every score before printing
     all_scores = {k: _safe(v) for k, v in all_scores.items()}
-    avg = _safe(sum(all_scores.values()) / len(all_scores)) if all_scores else 0.002
+    avg = _safe(sum(all_scores.values()) / len(all_scores)) if all_scores else 0.011
 
     print(json.dumps({
         "event":   "BENCHMARK_COMPLETE",
