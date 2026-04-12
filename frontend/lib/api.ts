@@ -58,7 +58,7 @@ export async function resetEnvironment(
   taskId?: string,
   timeoutMs = DEFAULT_TIMEOUTS.reset
 ): Promise<SQLOptObservation> {
-  const res = await fetchJson<{ observation: SQLOptObservation; info: any }>(
+  const res = await fetchJson<SQLOptObservation>(
     '/reset',
     {
       method: 'POST',
@@ -66,7 +66,8 @@ export async function resetEnvironment(
     },
     timeoutMs
   )
-  return res.observation
+  // Backend now returns the observation properly formatted as required by OpenEnv spec
+  return res
 }
 
 export async function submitStep(
