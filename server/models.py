@@ -51,13 +51,13 @@ class SQLOptAction(BaseModel):
 
 class SQLOptReward(BaseModel):
     total: float = 0.5
-    speedup_score: float = 0.0
-    equivalence_score: float = 0.0
-    pattern_score: float = 0.0
-    index_score: float = 0.0
-    simplicity_score: float = 0.0
-    penalties: float = 0.0
-    speedup_ratio: float = 0.0
+    speedup_score: float = 0.05
+    equivalence_score: float = 0.05
+    pattern_score: float = 0.05
+    index_score: float = 0.05
+    simplicity_score: float = 0.05
+    penalties: float = 0.05
+    speedup_ratio: float = 0.05
     hack_detected: bool = False
     hack_type: Optional[str] = None
 

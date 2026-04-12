@@ -59,11 +59,11 @@ class EquivalenceGrader:
 
             # Empty result edge cases
             if n_base == 0 and n_opt == 0:
-                return 0.99
+                return 0.95  # both empty = equivalent
             if n_base == 0:
                 return 0.3   # baseline empty but opt returns rows → suspicious
             if n_opt == 0:
-                return 0.01   # opt returns nothing → wrong
+                return 0.02  # opt returns nothing → wrong (can't be 0.0)
 
             # ── Row count ratio (soft, not hard) ────────────────────────────
             # If counts are the same → ratio = 1.0

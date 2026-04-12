@@ -83,18 +83,18 @@ class AntiPatternGrader:
         pattern = task.expected_pattern
 
         if pattern == "SELECT_STAR" and "SELECT *" not in opt:
-            return 0.99
+            return 0.95
         if pattern == "N_PLUS_ONE" and "JOIN" in opt:
-            return 0.99
+            return 0.95
         if pattern == "CARTESIAN_PRODUCT" and " ON " in opt:
-            return 0.99
+            return 0.95
         if pattern == "MISSING_INDEX" and action.index_statements:
-            return 0.99
+            return 0.95
         if pattern == "LEADING_WILDCARD" and "LIKE '%" not in opt:
-            return 0.8
+            return 0.80
         if pattern == "IMPLICIT_CAST" and "CAST" not in opt:
-            return 0.99
+            return 0.95
         if pattern == "UNBOUNDED_AGGREGATION" and ("WHERE" in opt or "BETWEEN" in opt):
-            return 0.99
+            return 0.95
 
         return 0.2  # Partial credit
