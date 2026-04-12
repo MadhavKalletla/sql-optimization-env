@@ -152,19 +152,9 @@ export default function DashboardPage() {
   }, [isEpisodeDone])
 
   const handleNextChallenge = useCallback(async () => {
-    // Find next available task based on current level
-    const currentTaskIndex = TASK_OPTIONS.findIndex(t => t.id === selectedTask)
-    const availableTasks = TASK_OPTIONS.filter(t => t.minLevel <= currentLevel)
-    
-    let nextTask = availableTasks[0] // Default to first available
-    if (currentTaskIndex >= 0 && currentTaskIndex < availableTasks.length - 1) {
-      nextTask = availableTasks[currentTaskIndex + 1]
-    }
-    
-    setSelectedTask(nextTask.id)
-    await reset(nextTask.id)
+    await reset()
     setEpisodeKey(k => k + 1)
-  }, [selectedTask, currentLevel, reset])
+  }, [reset])
 
   const handleModalNext = useCallback(async () => {
     setShowResultModal(false)

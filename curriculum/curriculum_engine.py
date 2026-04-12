@@ -26,7 +26,6 @@ class CurriculumEngine:
 
     def __init__(self):
         self._load_state()
-        self.current_level = 5  # Force unlock all tasks
 
     def _load_state(self):
         # Try env var first (survives cold restarts via HF Secret)
@@ -62,9 +61,6 @@ class CurriculumEngine:
         self.total_episodes = 0
         self.retry_count = 0
 
-        # FORCE ALL UNLOCK for user testing
-        self.current_level = 5
-
     def _save_state(self):
         data = {
             'level': self.current_level,
@@ -91,11 +87,14 @@ class CurriculumEngine:
     def _evaluate_transition(self):
         # Dynamic threshold — level 3 is harder, lower bar slightly
         # Level-aware graduation thresholds — harder levels need lower bars
-        _level_grad = {1: 0.70, 2: 0.70, 3: 0.58, 4: 0.45, 5: 0.35}
+        _level_grad = {1: 1.0, 2: 0.70, 3: 0.58, 4: 0.45, 5: 0.35}
         grad_threshold = _level_grad.get(self.current_level, self.GRADUATE_THRESHOLD)
 
-        if len(self.recent_scores) >= self.GRADUATE_CONSECUTIVE:
-            last_n = self.recent_scores[-self.GRADUATE_CONSECUTIVE:]
+        _level_grad_count = {1: 1, 2: 3, 3: 5, 4: 2, 5: 10}
+        grad_count = _level_grad_count.get(self.current_level, self.GRADUATE_CONSECUTIVE)
+
+        if len(self.recent_scores) >= grad_count:
+            last_n = self.recent_scores[-grad_count:]
             if all(s >= grad_threshold for s in last_n):
                 if self.current_level < self.MAX_LEVEL:
                     self.current_level += 1
