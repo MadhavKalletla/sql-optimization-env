@@ -21,7 +21,7 @@ class CurriculumEngine:
     GRADUATE_CONSECUTIVE = 3
     REMEDIATE_THRESHOLD = 0.40
     REMEDIATE_CONSECUTIVE = 2
-    MAX_LEVEL = 5
+    MAX_LEVEL = 3
     MIN_LEVEL = 1
 
     def __init__(self):
@@ -85,12 +85,11 @@ class CurriculumEngine:
         self._save_state()
 
     def _evaluate_transition(self):
-        # Dynamic threshold — level 3 is harder, lower bar slightly
-        # Level-aware graduation thresholds — harder levels need lower bars
-        _level_grad = {1: 1.0, 2: 0.70, 3: 0.58, 4: 0.45, 5: 0.35}
+        # Dynamic threshold — level 2 is harder, lower bar slightly
+        _level_grad = {1: 0.70, 2: 0.58, 3: 0.45}
         grad_threshold = _level_grad.get(self.current_level, self.GRADUATE_THRESHOLD)
 
-        _level_grad_count = {1: 1, 2: 3, 3: 5, 4: 2, 5: 10}
+        _level_grad_count = {1: 3, 2: 5, 3: 2}
         grad_count = _level_grad_count.get(self.current_level, self.GRADUATE_CONSECUTIVE)
 
         if len(self.recent_scores) >= grad_count:

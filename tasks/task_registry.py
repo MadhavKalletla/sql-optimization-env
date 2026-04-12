@@ -21,11 +21,9 @@ from tasks.hard.mgnrega_implicit_cast import TASK as T_H5
 
 
 LEVEL_TASKS = {
-    1: [T_E2, T_E4],            # Intro: SELECT* tasks (2 tasks)
-    2: [T_E1, T_E3, T_M4, T_M5], # Easy: missing index + aggregation (4 tasks)
-    3: [T_M1, T_M2, T_M3],      # Medium: N+1, Cartesian, wildcard (3 tasks)
-    4: [T_H1, T_H2, T_H4, T_H5], # Hard: multi-pattern (4 tasks)
-    5: [T_H3],                  # Expert: schema-level
+    1: [T_E1, T_E2, T_E3, T_E4],            # All Easy tasks (4 tasks)
+    2: [T_M1, T_M2, T_M3, T_M4, T_M5],      # All Medium tasks (5 tasks)
+    3: [T_H1, T_H2, T_H3, T_H4, T_H5],      # All Hard/Expert tasks (5 tasks)
 }
 
 

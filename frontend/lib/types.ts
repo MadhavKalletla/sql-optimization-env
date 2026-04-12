@@ -96,5 +96,5 @@ export const ANTI_PATTERN_COLORS: Record<AntiPatternType, string> = {
 };
 
 export const LEVEL_LABELS: Record<number, string> = {
-  1: 'Intro', 2: 'Easy', 3: 'Medium', 4: 'Hard', 5: 'Expert'
+  1: 'Easy', 2: 'Medium', 3: 'Hard', 4: 'Expert', 5: 'Master'
 };

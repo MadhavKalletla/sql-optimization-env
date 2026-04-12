@@ -21,16 +21,16 @@ import { AICoach } from '@/components/dashboard/AICoach'
 const TASK_OPTIONS = [
   { id: 'pds_select_star',            label: 'PDS: Avoid SELECT *',          difficulty: 'Easy',   minLevel: 1 },
   { id: 'mgnrega_count',              label: 'MGNREGA: Column Reduction',    difficulty: 'Easy',   minLevel: 1 },
-  { id: 'gst_missing_index',          label: 'GST: Add Missing Index',        difficulty: 'Easy',   minLevel: 2 },
-  { id: 'railway_simple_filter',      label: 'Railway: Filter Index',         difficulty: 'Easy',   minLevel: 2 },
+  { id: 'gst_missing_index',          label: 'GST: Add Missing Index',        difficulty: 'Easy',   minLevel: 1 },
+  { id: 'railway_simple_filter',      label: 'Railway: Filter Index',         difficulty: 'Easy',   minLevel: 1 },
   { id: 'railway_missing_index',      label: 'Railway: Journey Date Index',   difficulty: 'Medium', minLevel: 2 },
   { id: 'gst_unbounded_aggregation',  label: 'GST: Unbounded Aggregation',    difficulty: 'Medium', minLevel: 2 },
-  { id: 'gst_n_plus_one',            label: 'GST: N+1 Correlated Query',     difficulty: 'Medium', minLevel: 3 },
-  { id: 'pds_cartesian',             label: 'PDS: Cartesian Product Fix',    difficulty: 'Medium', minLevel: 3 },
-  { id: 'mgnrega_wildcard',          label: 'MGNREGA: Wildcard LIKE Fix',    difficulty: 'Medium', minLevel: 3 },
-  { id: 'pds_n_plus_one',            label: 'PDS: N+1 Beneficiary Query',    difficulty: 'Hard',   minLevel: 4 },
-  { id: 'mgnrega_implicit_cast',     label: 'MGNREGA: Implicit Type Cast',   difficulty: 'Hard',   minLevel: 4 },
-  { id: 'gst_multi_join',            label: 'GST: Multi-Table Join',         difficulty: 'Hard',   minLevel: 4 },
+  { id: 'gst_n_plus_one',            label: 'GST: N+1 Correlated Query',     difficulty: 'Medium', minLevel: 2 },
+  { id: 'pds_cartesian',             label: 'PDS: Cartesian Product Fix',    difficulty: 'Medium', minLevel: 2 },
+  { id: 'mgnrega_wildcard',          label: 'MGNREGA: Wildcard LIKE Fix',    difficulty: 'Medium', minLevel: 2 },
+  { id: 'pds_n_plus_one',            label: 'PDS: N+1 Beneficiary Query',    difficulty: 'Hard',   minLevel: 3 },
+  { id: 'mgnrega_implicit_cast',     label: 'MGNREGA: Implicit Type Cast',   difficulty: 'Hard',   minLevel: 3 },
+  { id: 'gst_multi_join',            label: 'GST: Multi-Table Join',         difficulty: 'Hard',   minLevel: 3 },
 ]
 
 const dotColor = (d: string) => d === 'Easy' ? '#22c55e' : d === 'Medium' ? '#f59e0b' : '#ef4444'
@@ -317,20 +317,20 @@ export default function DashboardPage() {
             className="absolute left-[10%] top-1/2 h-0.5"
             style={{ background: 'linear-gradient(90deg,#4A90D9,#00D4FF)', originX: 0 }}
             initial={{ width: 0 }}
-            animate={{ width: `${((currentLevel - 1) / 4) * 80}%` }}
+            animate={{ width: `${((currentLevel - 1) / 2) * 80}%` }}
             transition={{ duration: 0.6, ease: 'easeOut' }}
           />
-          {[1, 2, 3, 4, 5].map(level => (
+          {[1, 2, 3].map(level => (
             <CurriculumNode key={level} level={level} active={currentLevel} />
           ))}
 
           {/* Pass streak indicator */}
-          {envState?.recent_scores && envState.recent_scores.length > 0 && (
+          {envState?.recent_scores && envState.recent_scores.length > 0 && currentLevel < 3 && (
             <div style={{
               position: 'absolute', right: '2rem',
               fontSize: '0.7rem', color: '#FFD740',
             }}>
-              Pass streak: {envState.recent_scores.filter(s => s >= 0.70).length}/3 toward next level
+              Pass streak: {envState.recent_scores.filter(s => s >= (currentLevel === 1 ? 0.70 : 0.58)).length}/{currentLevel === 1 ? 3 : 5} toward next level
             </div>
           )}
         </div>

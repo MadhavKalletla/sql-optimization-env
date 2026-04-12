@@ -206,7 +206,7 @@ class SQLOptEnvironment:
 
         done = (
             self._state.current_step >= self._state.max_steps
-            or reward_detail.total >= {1: 0.70, 2: 0.70, 3: 0.58, 4: 0.45, 5: 0.35}.get(
+            or reward_detail.total >= {1: 0.70, 2: 0.58, 3: 0.45}.get(
                 self._state.curriculum_level, 0.70
             )
         )
