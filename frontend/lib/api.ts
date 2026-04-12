@@ -58,7 +58,7 @@ export async function resetEnvironment(
   taskId?: string,
   timeoutMs = DEFAULT_TIMEOUTS.reset
 ): Promise<SQLOptObservation> {
-  return fetchJson<SQLOptObservation>(
+  const res = await fetchJson<{ observation: SQLOptObservation; info: any }>(
     '/reset',
     {
       method: 'POST',
@@ -66,6 +66,7 @@ export async function resetEnvironment(
     },
     timeoutMs
   )
+  return res.observation
 }
 
 export async function submitStep(
