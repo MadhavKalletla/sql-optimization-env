@@ -56,7 +56,7 @@ class CurriculumEngine:
                 pass
 
         # Default
-        self.current_level = 5
+        self.current_level = 1
         self.recent_scores = []
         self.total_episodes = 0
         self.retry_count = 0
