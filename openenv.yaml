@@ -20,14 +20,18 @@ tasks:
 observations:
   type: object
   properties:
-    goal:             { type: string }
-    current_query:    { type: string }
-    schema_ddl:       { type: string }
-    execution_plan:   { type: object }
+    goal:              { type: string }
+    current_query:     { type: string }
+    schema_ddl:        { type: string }
+    execution_plan:    { type: object }
     execution_time_ms: { type: number }
-    db_stats:         { type: object }
-    step_count:       { type: integer }
-    task_id:          { type: string }
+    db_stats:          { type: object }
+    step_count:        { type: integer }
+    task_id:           { type: string }
+    row_count:         { type: integer }
+    curriculum_level:  { type: integer }
+    anti_pattern_hint: { type: string }
+    error_message:     { type: string }
 
 actions:
   type: object

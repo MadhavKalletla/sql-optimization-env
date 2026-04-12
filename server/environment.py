@@ -114,7 +114,7 @@ class SQLOptEnvironment:
 
         return SQLOptObservation(
             task_id=task.task_id,
-            step_number=0,
+            step_count=0,
             goal=task.goal,
             schema_ddl=task.schema_ddl,
             current_query=task.slow_query,
@@ -193,7 +193,7 @@ class SQLOptEnvironment:
 
         next_obs = SQLOptObservation(
             task_id=task.task_id,
-            step_number=self._state.current_step,
+            step_count=self._state.current_step,
             goal=task.goal,
             schema_ddl=task.schema_ddl,
             current_query=action.optimized_query,

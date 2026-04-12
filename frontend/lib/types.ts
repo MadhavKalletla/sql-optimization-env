@@ -15,7 +15,7 @@ export interface ExecutionPlan {
 
 export interface SQLOptObservation {
   task_id: string;
-  step_number: number;
+  step_count: number;
   goal: string;
   schema_ddl: string;
   current_query: string;

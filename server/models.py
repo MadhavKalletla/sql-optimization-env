@@ -28,7 +28,7 @@ class ExecutionPlan(BaseModel):
 
 class SQLOptObservation(BaseModel):
     task_id: str
-    step_number: int = Field(ge=0)
+    step_count: int = Field(ge=0)
     goal: str
     schema_ddl: str
     current_query: str
