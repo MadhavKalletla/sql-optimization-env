@@ -21,12 +21,14 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 _DEFAULT_DB = _ROOT / "data" / "fixtures" / "benchmark_seed42.db"
 
 
-def _clamp(v: float) -> float:
-    """Clamp to strictly (0.01, 0.99) range."""
-    return round(max(0.01, min(0.99, v)), 4)
+    pass
 
 
 class EquivalenceGrader:
+    @staticmethod
+    def _clamp(v):
+        r = round(max(0.01, min(0.99, float(v))), 4)
+        return 0.5 if (r <= 0.0 or r >= 1.0) else r
 
     def grade(self, task, optimized_query: str, db_path: Path = None) -> float:
         db = db_path or _DEFAULT_DB
@@ -95,7 +97,7 @@ class EquivalenceGrader:
             # 20% row count ratio     (soft penalty for very different cardinality)
             score = (jaccard * 0.50) + (exact_overlap * 0.30) + (count_ratio * 0.20)
 
-            return _clamp(score)
+            return self._clamp(score)
 
         finally:
             conn.close()

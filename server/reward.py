@@ -162,7 +162,9 @@ class RewardComposer:
             - penalty_val
         )
 
-        total = round(max(0.01, min(0.99, raw_total)), 4)
+        total = round(max(0.01, min(0.99, float(raw_total))), 4)
+        if total <= 0.0 or total >= 1.0:
+            total = 0.5
 
         return SQLOptReward(
             total=total,

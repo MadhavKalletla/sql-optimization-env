@@ -7,12 +7,14 @@ Returns value in [0.0, 1.0].  Weight (0.20) applied by RewardComposer.
 from ..models import AntiPatternType, SQLOptAction
 
 
-def _clamp(v: float) -> float:
-    """Clamp to strictly (0.01, 0.99) range."""
-    return round(max(0.01, min(0.99, v)), 4)
+
 
 
 class AntiPatternGrader:
+    @staticmethod
+    def _clamp(v):
+        r = round(max(0.01, min(0.99, float(v))), 4)
+        return 0.5 if (r <= 0.0 or r >= 1.0) else r
 
     def grade(self, task, action: SQLOptAction) -> float:
         score = 0.01
@@ -42,7 +44,7 @@ class AntiPatternGrader:
         fix_score = self._grade_fix_quality(task, action)
         score += fix_score * 0.30
 
-        return _clamp(score)
+        return self._clamp(score)
 
     def _is_partial_match(self, identified: str, expected: str) -> bool:
         related = {

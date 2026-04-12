@@ -250,6 +250,8 @@ class SQLOptEnvironment:
 
         # ✅ Always strictly between 0 and 1
         final_reward = round(max(0.01, min(0.99, float(reward_detail.total))), 4)
+        if final_reward <= 0.0 or final_reward >= 1.0:
+            final_reward = 0.5
 
         return StepResult(
             observation=next_obs,

@@ -31,6 +31,10 @@ Cannot-measure sentinel (plans unavailable AND both times < 2 ms): 0.25
 
 
 class SpeedupGrader:
+    @staticmethod
+    def _clamp(v):
+        r = round(max(0.01, min(0.99, float(v))), 4)
+        return 0.5 if (r <= 0.0 or r >= 1.0) else r
 
     def grade(
         self,
@@ -76,10 +80,10 @@ class SpeedupGrader:
         # Only use timing when there is a meaningful difference (> 10 %).
         ratio = orig_time_ms / max(opt_time_ms, 0.001)
 
-        if ratio >= 50:   return 0.99
-        if ratio >= 20:   return 0.85
-        if ratio >= 10:   return 0.70
-        if ratio >= 5:    return 0.50
-        if ratio >= 2:    return 0.30
-        if ratio >= 1.1:  return 0.15
-        return 0.05  # never return 0.01 for timing alone
+        if ratio >= 50:   return self._clamp(0.99)
+        if ratio >= 20:   return self._clamp(0.85)
+        if ratio >= 10:   return self._clamp(0.70)
+        if ratio >= 5:    return self._clamp(0.50)
+        if ratio >= 2:    return self._clamp(0.30)
+        if ratio >= 1.1:  return self._clamp(0.15)
+        return self._clamp(0.05)

@@ -223,32 +223,30 @@ class ResetRequest(BaseModel):
 
 
 # ── GET /reset — browser friendly, no body ───────────────────
-@app.get("/reset", response_model=ResetResponse)
+@app.get("/reset")
 async def reset_get(task_id: Optional[str] = Query(default=None)):
-    """Reset the environment. Pass task_id as query param: /reset?task_id=gst_missing_index"""
     if env is None:
         raise HTTPException(status_code=500, detail="Environment not initialized")
     try:
         obs = env.reset(task_id=task_id)
-        return {"observation": obs.dict(), "info": {}}
+        return obs
     except Exception as e:
         print(f"[RESET ERROR] {e}", flush=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
 # ── POST /reset — validator + inference.py friendly ──────────
-@app.post("/reset", response_model=ResetResponse)
+@app.post("/reset")
 async def reset_post(
     task_id_query: Optional[str] = Query(default=None, alias="task_id"),
     body: Optional[ResetRequest] = Body(default=None),
 ):
-    """Reset the environment. task_id can be in query param OR JSON body."""
     if env is None:
         raise HTTPException(status_code=500, detail="Environment not initialized")
     resolved = (body.task_id if body else None) or task_id_query
     try:
         obs = env.reset(task_id=resolved)
-        return {"observation": obs.dict(), "info": {}}
+        return obs
     except Exception as e:
         print(f"[RESET ERROR] {e}", flush=True)
         raise HTTPException(status_code=500, detail=str(e))
