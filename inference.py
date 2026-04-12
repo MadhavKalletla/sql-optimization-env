@@ -80,7 +80,7 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]):
     print("[END]", json.dumps({
         "success": success,
         "steps":   steps,
-        "score":   _safe(score),
+        "score":   score,
         "rewards": [_safe(r) for r in rewards],
     }), flush=True)
 
@@ -197,8 +197,8 @@ def run_task(client: OpenAI, task_id: str) -> float:
             break
 
     # ── Score ─────────────────────────────────────────────────────────────────
-    score   = sum(rewards) / len(rewards) if rewards else 0.011
-    score   = _safe(score)
+    score = sum(rewards) / len(rewards) if rewards else 0.5
+    score = round(max(0.01, min(0.99, float(score))), 4)
     success = score >= SUCCESS_THRESHOLD
 
     log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
