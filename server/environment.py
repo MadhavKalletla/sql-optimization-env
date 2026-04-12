@@ -3,6 +3,7 @@
 import random
 import re
 import sqlite3
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -64,17 +65,17 @@ class SQLOptEnvironment:
         self._current_task = None
         self._db_path = DB_PATH
 
-        # ✅ Only seed if DB doesn't exist or is empty — never re-seed
+        # [INIT] Only seed if DB doesn't exist or is empty — never re-seed
         if not self._db_path.exists() or self._db_path.stat().st_size < 100_000:
             try:
-                print(f"🚀 Seeding database ({SEED_ROWS} rows)…", flush=True)
+                print(f"[INIT] Seeding database ({SEED_ROWS} rows)...", flush=True)
                 self._db_path.parent.mkdir(parents=True, exist_ok=True)
                 seed_database(str(self._db_path), SEED_ROWS)
-                print("✅ Database seeded successfully", flush=True)
+                print("[INIT] Database seeded successfully", flush=True)
             except Exception as e:
-                print(f"❌ Seeding failed: {e}", flush=True)
+                print(f"[INIT] Seeding failed: {e}", flush=True)
         else:
-            print("✅ Database already exists — reusing", flush=True)
+            print("[INIT] Database already exists - reusing", flush=True)
 
     # ─────────────────────────────────────────
     # RESET
@@ -104,7 +105,32 @@ class SQLOptEnvironment:
             is_running=True,
         )
 
-        raw_time, orig_rows, exec_plan = self._run_query(task.slow_query)
+        # Run the slow query with a 10-second timeout so reset() never hangs
+        result_holder = [None]
+        def _run_query_thread():
+            try:
+                result_holder[0] = self._run_query(task.slow_query)
+            except Exception:
+                pass
+        t = threading.Thread(target=_run_query_thread, daemon=True)
+        t.start()
+        t.join(timeout=10)
+
+        if result_holder[0] is not None:
+            raw_time, orig_rows, exec_plan = result_holder[0]
+        else:
+            print(f"[RESET] Query timeout for {task.task_id} — using fallback", flush=True)
+            raw_time, orig_rows = 100.0, 1000
+            exec_plan = ExecutionPlan(
+                operation="FULL TABLE SCAN",
+                rows_examined=1000,
+                rows_returned=1000,
+                cost_estimate=1.0,
+                using_index=None,
+                missing_index_hint="Consider adding an index",
+                explain_raw="SCAN TABLE",
+            )
+
         task.original_time_ms = raw_time
         task.original_plan = exec_plan
 
@@ -138,15 +164,32 @@ class SQLOptEnvironment:
         hack = self.hack_detector.detect(action, task)
 
         query_error = None
-        try:
-            opt_time, opt_rows, opt_plan = self._run_query(
-                action.optimized_query, action.index_statements
-            )
-        except Exception as e:
+        step_result_holder = [None]
+        def _step_query_thread():
+            try:
+                step_result_holder[0] = self._run_query(
+                    action.optimized_query, action.index_statements
+                )
+            except Exception as e:
+                step_result_holder[0] = e
+        st = threading.Thread(target=_step_query_thread, daemon=True)
+        st.start()
+        st.join(timeout=15)
+
+        if step_result_holder[0] is None:
+            # Timeout — treat as very slow query
+            print(f"[STEP] Query timeout — using fallback", flush=True)
             opt_time = task.original_time_ms * 3.0
             opt_rows = 0
             opt_plan = None
-            query_error = str(e)
+            query_error = "Query execution timed out (>15s)"
+        elif isinstance(step_result_holder[0], Exception):
+            opt_time = task.original_time_ms * 3.0
+            opt_rows = 0
+            opt_plan = None
+            query_error = str(step_result_holder[0])
+        else:
+            opt_time, opt_rows, opt_plan = step_result_holder[0]
 
         reward_detail = self.reward_composer.compute(
             task=task,
