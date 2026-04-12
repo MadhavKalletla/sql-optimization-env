@@ -21,7 +21,7 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 _DEFAULT_DB = _ROOT / "data" / "fixtures" / "benchmark_seed42.db"
 
 
-    pass
+
 
 
 class EquivalenceGrader:
