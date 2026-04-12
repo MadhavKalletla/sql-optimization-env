@@ -70,6 +70,11 @@ class StepResult(BaseModel):
     info: Dict[str, Any] = Field(default_factory=dict)
 
 
+class ResetResponse(BaseModel):
+    observation: SQLOptObservation
+    info: Dict[str, Any] = Field(default_factory=dict)
+
+
 class EnvironmentState(BaseModel):
     episode_id: str
     current_task_id: str

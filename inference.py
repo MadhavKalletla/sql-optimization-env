@@ -149,7 +149,8 @@ def run_task(client: OpenAI, task_id: str) -> float:
             timeout=30,
         )
         resp.raise_for_status()
-        obs = resp.json()
+        reset_data = resp.json()
+        obs = reset_data.get("observation", reset_data)
     except Exception as e:
         print(f"[ERROR] Reset failed for {task_id}: {e}", flush=True)
         log_end(success=False, steps=0, score=0.011, rewards=[0.011])

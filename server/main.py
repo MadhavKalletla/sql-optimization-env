@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .environment import SQLOptEnvironment
-from .models import SQLOptAction, SQLOptObservation, EnvironmentState, StepResult
+from .models import SQLOptAction, SQLOptObservation, EnvironmentState, StepResult, ResetResponse
 
 env: SQLOptEnvironment = None
 
@@ -223,7 +223,7 @@ class ResetRequest(BaseModel):
 
 
 # ── GET /reset — browser friendly, no body ───────────────────
-@app.get("/reset")
+@app.get("/reset", response_model=ResetResponse)
 async def reset_get(task_id: Optional[str] = Query(default=None)):
     """Reset the environment. Pass task_id as query param: /reset?task_id=gst_missing_index"""
     if env is None:
@@ -237,7 +237,7 @@ async def reset_get(task_id: Optional[str] = Query(default=None)):
 
 
 # ── POST /reset — validator + inference.py friendly ──────────
-@app.post("/reset")
+@app.post("/reset", response_model=ResetResponse)
 async def reset_post(
     task_id_query: Optional[str] = Query(default=None, alias="task_id"),
     body: Optional[ResetRequest] = Body(default=None),
